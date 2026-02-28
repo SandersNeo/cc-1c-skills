@@ -282,6 +282,12 @@ Clear filters. Without arguments clears all, with `{ field }` clears specific ba
 #### `screenshot()` → PNG Buffer
 #### `wait(seconds)` → form state
 #### `getPage()` → Playwright Page (raw, for advanced scripting)
+#### `startRecording(path, opts?)` / `stopRecording()` → MP4 video recording
+#### `showCaption(text, opts?)` / `hideCaption()` → text overlay on page
+#### `isRecording()` → boolean
+
+See [recording.md](recording.md) for setup (ffmpeg), API details, and examples.
+If `.v8-project.json` has `ffmpegPath`, pass it to `startRecording({ ffmpegPath })`.
 
 ## Common patterns
 

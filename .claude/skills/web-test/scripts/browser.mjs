@@ -7,6 +7,10 @@
  * Handles connection, navigation, waiting, screenshots.
  */
 import { chromium } from 'playwright';
+import { spawn, execFileSync } from 'child_process';
+import { statSync, mkdirSync, existsSync as fsExistsSync } from 'fs';
+import { dirname, resolve as pathResolve } from 'path';
+import { fileURLToPath } from 'url';
 import {
   readSectionsScript, readTabsScript, readCommandsScript,
   readFormScript, navigateSectionScript, openCommandScript,
@@ -20,6 +24,7 @@ let browser = null;
 let page = null;
 let sessionPrefix = null; // e.g. "http://localhost:8081/bpdemo/ru_RU"
 let seanceId = null;
+let recorder = null; // { cdp, ffmpeg, startTime, outputPath }
 
 const LOAD_TIMEOUT = 60000;
 const INIT_TIMEOUT = 60000;
@@ -79,6 +84,11 @@ export async function connect(url) {
  * Sends POST /e1cib/logout to release the license before closing.
  */
 export async function disconnect() {
+  // Auto-stop recording if active (prevents orphaned ffmpeg)
+  if (recorder) {
+    try { await stopRecording(); } catch {}
+  }
+
   if (browser) {
     // Graceful logout — release the 1C license
     if (page && !page.isClosed() && seanceId && sessionPrefix) {
@@ -2352,6 +2362,210 @@ export async function wait(seconds) {
   ensureConnected();
   await page.waitForTimeout(seconds * 1000);
   return await getFormState();
+}
+
+// ============================================================
+// Video recording — CDP screencast + ffmpeg
+// ============================================================
+
+/** Check if video recording is active. */
+export function isRecording() {
+  return recorder !== null;
+}
+
+/**
+ * Start video recording via CDP screencast + ffmpeg.
+ * Frames are captured as JPEG and piped to ffmpeg for MP4 encoding.
+ * @param {string} outputPath — output .mp4 file path
+ * @param {object} [opts]
+ * @param {number} [opts.fps=25] — target framerate
+ * @param {number} [opts.quality=80] — JPEG quality (1-100)
+ * @param {string} [opts.ffmpegPath] — explicit path to ffmpeg binary
+ */
+export async function startRecording(outputPath, opts = {}) {
+  ensureConnected();
+  if (recorder) throw new Error('Already recording. Call stopRecording() first.');
+
+  const fps = opts.fps || 25;
+  const quality = opts.quality || 80;
+  const ffmpegPath = resolveFfmpeg(opts.ffmpegPath);
+
+  // Ensure output directory exists
+  const resolvedPath = pathResolve(outputPath);
+  mkdirSync(dirname(resolvedPath), { recursive: true });
+
+  // Create CDP session for screencast
+  const cdp = await page.context().newCDPSession(page);
+
+  // Spawn ffmpeg process
+  const ffmpeg = spawn(ffmpegPath, [
+    '-y',                          // overwrite output
+    '-f', 'image2pipe',            // input: piped images
+    '-framerate', String(fps),     // input framerate
+    '-i', '-',                     // read from stdin
+    '-c:v', 'libx264',            // H.264 codec
+    '-preset', 'ultrafast',        // fast encoding
+    '-pix_fmt', 'yuv420p',        // broad compatibility
+    '-movflags', '+faststart',     // web-friendly MP4
+    resolvedPath
+  ], { stdio: ['pipe', 'ignore', 'pipe'] });
+
+  let ffmpegError = '';
+  ffmpeg.stderr.on('data', d => { ffmpegError += d.toString(); });
+  ffmpeg.on('error', err => { ffmpegError += err.message; });
+
+  // Listen for screencast frames and pipe to ffmpeg
+  cdp.on('Page.screencastFrame', async ({ data, sessionId }) => {
+    const buf = Buffer.from(data, 'base64');
+    if (!ffmpeg.stdin.destroyed) {
+      ffmpeg.stdin.write(buf);
+    }
+    try { await cdp.send('Page.screencastFrameAck', { sessionId }); } catch {}
+  });
+
+  // Start the screencast
+  await cdp.send('Page.startScreencast', {
+    format: 'jpeg',
+    quality,
+    everyNthFrame: 1
+  });
+
+  recorder = { cdp, ffmpeg, startTime: Date.now(), outputPath: resolvedPath, ffmpegError: '' };
+  // Redirect stderr accumulation to the recorder object
+  ffmpeg.stderr.removeAllListeners('data');
+  ffmpeg.stderr.on('data', d => { recorder.ffmpegError += d.toString(); });
+}
+
+/**
+ * Stop video recording. Finalizes the MP4 file.
+ * @returns {{ file: string, duration: number, size: number }}
+ */
+export async function stopRecording() {
+  if (!recorder) throw new Error('Not recording. Call startRecording() first.');
+
+  const { cdp, ffmpeg, startTime, outputPath } = recorder;
+
+  // Stop CDP screencast
+  try { await cdp.send('Page.stopScreencast'); } catch {}
+  try { await cdp.detach(); } catch {}
+
+  // Close ffmpeg stdin and wait for encoding to finish
+  await new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      ffmpeg.kill('SIGKILL');
+      reject(new Error('ffmpeg timed out after 30s'));
+    }, 30000);
+
+    ffmpeg.on('close', (code) => {
+      clearTimeout(timeout);
+      if (code === 0) resolve();
+      else reject(new Error(`ffmpeg exited with code ${code}: ${recorder?.ffmpegError || ''}`));
+    });
+    ffmpeg.on('error', (err) => {
+      clearTimeout(timeout);
+      reject(err);
+    });
+
+    ffmpeg.stdin.end();
+  });
+
+  const duration = (Date.now() - startTime) / 1000;
+  const stats = statSync(outputPath);
+  recorder = null;
+
+  return {
+    file: outputPath,
+    duration: Math.round(duration * 10) / 10,
+    size: stats.size
+  };
+}
+
+/**
+ * Show a text caption overlay on the page (visible in recording).
+ * Calling again updates the text without creating a new element.
+ * @param {string} text — caption text
+ * @param {object} [opts]
+ * @param {'top'|'bottom'} [opts.position='bottom'] — vertical position
+ * @param {number} [opts.fontSize=24] — font size in pixels
+ * @param {string} [opts.background='rgba(0,0,0,0.7)'] — background color
+ * @param {string} [opts.color='#fff'] — text color
+ */
+export async function showCaption(text, opts = {}) {
+  ensureConnected();
+  const position = opts.position || 'bottom';
+  const fontSize = opts.fontSize || 24;
+  const bg = opts.background || 'rgba(0,0,0,0.7)';
+  const color = opts.color || '#fff';
+
+  await page.evaluate(({ text, position, fontSize, bg, color }) => {
+    let el = document.getElementById('__web_test_caption');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = '__web_test_caption';
+      el.style.cssText = `
+        position: fixed; left: 0; right: 0; z-index: 99999;
+        text-align: center; padding: 12px 24px;
+        font-family: Arial, sans-serif; pointer-events: none;
+      `;
+      document.body.appendChild(el);
+    }
+    el.style[position === 'top' ? 'top' : 'bottom'] = '20px';
+    el.style[position === 'top' ? 'bottom' : 'top'] = 'auto';
+    el.style.fontSize = fontSize + 'px';
+    el.style.background = bg;
+    el.style.color = color;
+    el.textContent = text;
+  }, { text, position, fontSize, bg, color });
+}
+
+/** Remove the caption overlay from the page. */
+export async function hideCaption() {
+  ensureConnected();
+  await page.evaluate(() => {
+    const el = document.getElementById('__web_test_caption');
+    if (el) el.remove();
+  });
+}
+
+// ============================================================
+// Private helpers
+// ============================================================
+
+/** Resolve ffmpeg binary path. */
+function resolveFfmpeg(explicit) {
+  // 1. Explicit path
+  if (explicit) {
+    try { execFileSync(explicit, ['-version'], { stdio: 'ignore', timeout: 5000 }); return explicit; }
+    catch { throw new Error(`ffmpeg not found at: ${explicit}`); }
+  }
+
+  // 2. FFMPEG_PATH env var
+  const envPath = process.env.FFMPEG_PATH;
+  if (envPath) {
+    try { execFileSync(envPath, ['-version'], { stdio: 'ignore', timeout: 5000 }); return envPath; }
+    catch { /* fall through */ }
+  }
+
+  // 3. System PATH
+  try { execFileSync('ffmpeg', ['-version'], { stdio: 'ignore', timeout: 5000 }); return 'ffmpeg'; }
+  catch { /* fall through */ }
+
+  // 4. tools/ffmpeg/bin/ffmpeg.exe relative to project root
+  const __filename = fileURLToPath(import.meta.url);
+  const projectRoot = pathResolve(dirname(__filename), '..', '..', '..', '..');
+  const localPath = pathResolve(projectRoot, 'tools', 'ffmpeg', 'bin', 'ffmpeg.exe');
+  if (fsExistsSync(localPath)) {
+    try { execFileSync(localPath, ['-version'], { stdio: 'ignore', timeout: 5000 }); return localPath; }
+    catch { /* fall through */ }
+  }
+
+  // 5. Error with instructions
+  throw new Error(
+    'ffmpeg not found. Install it:\n' +
+    '  - Download from https://ffmpeg.org/download.html\n' +
+    '  - Add to PATH, or set FFMPEG_PATH env var, or place in tools/ffmpeg/bin/\n' +
+    '  - Or pass ffmpegPath option to startRecording()'
+  );
 }
 
 function ensureConnected() {
