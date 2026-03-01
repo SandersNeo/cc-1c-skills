@@ -46,7 +46,7 @@
 
 ### Другие AI-платформы
 
-Навыки совместимы с Cursor, GitHub Copilot, OpenAI Codex, Gemini CLI и OpenCode. Скрипт `switch.py` копирует навыки в нужный формат с перезаписью путей:
+Навыки совместимы с Cursor, GitHub Copilot, Kiro, OpenAI Codex, Gemini CLI и OpenCode. Скрипт `switch.py` копирует навыки в нужный формат с перезаписью путей:
 
 ```bash
 python scripts/switch.py                           # интерактивный режим (пошаговый диалог)
@@ -62,6 +62,7 @@ python scripts/switch.py --undo cursor             # удалить копию
 | Claude Code | `.claude/skills/` | да | `/epf-init`, `/mxl-compile`, ... |
 | Cursor | `.cursor/skills/` | да | через меню команд |
 | GitHub Copilot | `.github/skills/` | да | `/skills` в чате |
+| Kiro | `.kiro/skills/` | да | через steering |
 | OpenAI Codex | `.codex/skills/` | да | `$skill-name` |
 | Gemini CLI | `.gemini/skills/` | да | нет |
 | OpenCode | `.opencode/skills/` | да | через skill tool |
