@@ -2727,17 +2727,18 @@ export async function addNarration(videoPath, opts = {}) {
         segments.push({ file: silenceFile, type: 'silence' });
       }
 
-      // Check if TTS audio is longer than gap to next caption — trim if needed
+      // Speed up TTS if it's longer than gap to next caption (instead of trimming)
       if (i < captions.length - 1) {
         const nextTimeMs = captions[i + 1].time;
         const maxDuration = (nextTimeMs - captionTimeMs) / 1000;
         if (ttsDuration > maxDuration && maxDuration > 0.1) {
-          const trimmedFile = pathJoin(tempDir, `tts_${i}_trimmed.mp3`);
+          const tempo = ttsDuration / maxDuration;
+          const spedFile = pathJoin(tempDir, `tts_${i}_sped.mp3`);
           execFileSync(ffmpegPath, [
-            '-y', '-i', ttsFile, '-t', String(maxDuration),
-            '-c:a', 'copy', trimmedFile,
+            '-y', '-i', ttsFile, '-af', `atempo=${tempo.toFixed(4)}`,
+            '-c:a', 'libmp3lame', '-b:a', '128k', spedFile,
           ], { stdio: 'pipe', timeout: 10000 });
-          segments.push({ file: trimmedFile, type: 'tts' });
+          segments.push({ file: spedFile, type: 'tts' });
           continue;
         }
       }
@@ -3067,7 +3068,7 @@ function resolveFfmpeg(explicit) {
 async function edgeTtsProvider(text, outputPath, opts = {}) {
   // Resolve from tools/node_modules/ (next to ffmpeg)
   const __fn = fileURLToPath(import.meta.url);
-  const ttsModulePath = pathResolve(dirname(__fn), '..', '..', '..', '..', 'tools', 'node_modules', 'node-edge-tts', 'dist', 'edge-tts.js');
+  const ttsModulePath = pathResolve(dirname(__fn), '..', '..', '..', '..', 'tools', 'tts', 'node_modules', 'node-edge-tts', 'dist', 'edge-tts.js');
   const { EdgeTTS } = await import(pathToFileURL(ttsModulePath).href);
   const voice = opts.voice || 'ru-RU-DmitryNeural';
   const tts = new EdgeTTS({ voice });
