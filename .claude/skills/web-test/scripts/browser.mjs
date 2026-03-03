@@ -459,28 +459,35 @@ export async function openFile(filePath) {
         }
         await waitForStable(formBefore);
       }
-      // After confirmation, check if form appeared or we need to retry
+      // After confirmation, check for a follow-up informational dialog (OK button)
+      // 1C may show "file opened in safe mode, please re-open" modal
+      const err2 = await checkForErrors();
+      if (err2?.modal) {
+        await dismissPendingErrors();
+        await waitForStable(formBefore);
+        // Dismissed the info dialog — retry the whole open cycle
+        continue;
+      }
+      // Check if the EPF form appeared
       const formAfter = await page.evaluate(detectFormScript());
       if (formAfter != null && formAfter !== formBefore) {
         const state = await getFormState();
         state.opened = { file: absPath, attempt: attempt + 1 };
         return state;
       }
-      // Form didn't open — security dialog asked to re-open, retry
+      // Form didn't appear — retry
       continue;
     }
 
     // No security dialog — check if form appeared
+    if (err?.modal) {
+      throw new Error(`Error opening file: ${err.modal.message}`);
+    }
     const formAfter = await page.evaluate(detectFormScript());
     if (formAfter != null && formAfter !== formBefore) {
       const state = await getFormState();
       state.opened = { file: absPath, attempt: attempt + 1 };
       return state;
-    }
-
-    // If modal error appeared instead of a form
-    if (err?.modal) {
-      throw new Error(`Error opening file: ${err.modal.message}`);
     }
   }
 
