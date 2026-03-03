@@ -889,8 +889,11 @@ export function checkErrorsScript() {
       if (elCount > 100) continue; // Skip large content forms
       if (buttons.length > 1) {
         // Confirmation dialog (multiple buttons: Да/Нет, OK/Отмена, etc.)
+        // Must have a Message element — real 1C confirmations always have form{N}_Message.
+        // Without it, this is just a regular form with multiple buttons (e.g. EPF form).
         const msgEl = document.getElementById(p + 'Message');
-        const message = msgEl?.innerText?.trim() || '';
+        if (!msgEl || msgEl.offsetWidth === 0) continue;
+        const message = msgEl.innerText?.trim() || '';
         const btnNames = buttons.map(el => {
           const b = { name: el.innerText?.trim() || '' };
           if (el.classList.contains('pressDefault')) b.default = true;

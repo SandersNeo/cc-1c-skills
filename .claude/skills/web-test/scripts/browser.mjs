@@ -400,6 +400,105 @@ function normalizeE1cibUrl(url) {
   return `e1cib/list/${url}`;
 }
 
+/**
+ * Open an external data processor or report (EPF/ERF) via File → Open menu.
+ * Handles the security confirmation dialog on first open.
+ * @param {string} filePath - path to EPF/ERF file (absolute or relative to cwd)
+ * @returns {Promise<object>} form state of the opened processor/report
+ */
+export async function openFile(filePath) {
+  ensureConnected();
+  await dismissPendingErrors();
+  const absPath = pathResolve(filePath);
+
+  const MAX_ATTEMPTS = 2; // 1st may trigger security dialog, 2nd is the real open
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    const formBefore = await page.evaluate(detectFormScript());
+
+    // 1. Ctrl+O opens 1C's "Выбор файлов" dialog
+    await page.keyboard.press('Control+o');
+
+    // 2. Wait for the file selection dialog
+    const dialogOk = await waitForCondition(`(() => {
+      const ok = document.querySelector('#fileSelectDialogOk');
+      return ok && ok.offsetWidth > 0 ? true : false;
+    })()`, 3000);
+    if (!dialogOk) throw new Error("File selection dialog did not open (Ctrl+O)");
+
+    // 3. Click "выберите с диска" to trigger the native OS file picker
+    let fileChooser;
+    try {
+      [fileChooser] = await Promise.all([
+        page.waitForEvent('filechooser', { timeout: 5000 }),
+        page.click('a.underline.pointer'),
+      ]);
+    } catch (e) {
+      // Try closing the dialog before throwing
+      await page.keyboard.press('Escape');
+      throw new Error(`File chooser did not appear: ${e.message}`);
+    }
+
+    // 4. Set the file path and click OK
+    await fileChooser.setFiles(absPath);
+    await page.waitForTimeout(500);
+    await page.click('#fileSelectDialogOk');
+    await waitForStable(formBefore);
+
+    // 5. Check for security dialog
+    const err = await checkForErrors();
+    if (err?.confirmation) {
+      // Security confirmation — click the positive button (Продолжить/Да/OK)
+      const positiveBtn = err.confirmation.buttons.find(b =>
+        /продолжить|да|ok|yes|открыть/i.test(b)
+      ) || err.confirmation.buttons[0];
+      if (positiveBtn) {
+        const btns = await page.$$(`#form${err.confirmation.formNum}_container a.press.pressButton`);
+        for (const b of btns) {
+          const txt = (await b.textContent())?.trim();
+          if (txt === positiveBtn) { await b.click(); break; }
+        }
+        await waitForStable(formBefore);
+      }
+      // After confirmation, check if EPF form appeared or a follow-up dialog showed.
+      // Check form change FIRST — avoids confusing a small EPF form with a modal dialog.
+      const formAfter = await page.evaluate(detectFormScript());
+      if (formAfter != null && formAfter !== formBefore) {
+        // New form appeared — but is it the EPF or an informational dialog?
+        // Informational "re-open" dialogs are tiny (< 20 elements).
+        const elCount = await page.evaluate(`document.querySelectorAll('[id^="form${formAfter}_"]').length`);
+        if (elCount < 20) {
+          // Likely an info dialog — check and dismiss
+          const err2 = await checkForErrors();
+          if (err2?.modal) {
+            await dismissPendingErrors();
+            await waitForStable(formBefore);
+            continue; // retry open cycle
+          }
+        }
+        // It's the real EPF form
+        const state = await getFormState();
+        state.opened = { file: absPath, attempt: attempt + 1 };
+        return state;
+      }
+      // Form didn't appear — retry
+      continue;
+    }
+
+    // No security dialog — check if form appeared
+    if (err?.modal) {
+      throw new Error(`Error opening file: ${err.modal.message}`);
+    }
+    const formAfter = await page.evaluate(detectFormScript());
+    if (formAfter != null && formAfter !== formBefore) {
+      const state = await getFormState();
+      state.opened = { file: absPath, attempt: attempt + 1 };
+      return state;
+    }
+  }
+
+  throw new Error(`Form did not open after ${MAX_ATTEMPTS} attempts for: ${absPath}`);
+}
+
 /** Navigate to a 1C navigation link via Shift+F11 dialog. Returns new form state. */
 export async function navigateLink(url) {
   ensureConnected();

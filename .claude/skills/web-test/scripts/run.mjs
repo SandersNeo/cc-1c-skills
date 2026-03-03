@@ -119,7 +119,7 @@ async function executeScript(code) {
     // and stop execution immediately with diagnostic info
     const ACTION_FNS = [
       'clickElement', 'fillFields', 'selectValue', 'fillTableRow',
-      'deleteTableRow', 'openCommand', 'navigateSection', 'navigateLink',
+      'deleteTableRow', 'openCommand', 'navigateSection', 'navigateLink', 'openFile',
       'closeForm', 'filterList', 'unfilterList'
     ];
     for (const name of ACTION_FNS) {
