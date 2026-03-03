@@ -216,6 +216,18 @@ For OpenAI-compatible provider:
 }
 ```
 
+For ElevenLabs:
+```json
+{
+  "tts": {
+    "provider": "elevenlabs",
+    "apiKey": "sk_...",
+    "voice": "JBFqnCBsd6RMkjVDRZzb"
+  }
+}
+```
+Note: `voice` is the ElevenLabs voice ID (not a name). Default model: `eleven_multilingual_v2` (supports Russian and other languages).
+
 ### `showCaption()` speech parameter
 
 The `speech` option controls what text is narrated (vs displayed):
@@ -236,7 +248,7 @@ Generate TTS and merge audio with video. Call after `stopRecording()`.
 |-----------|------|-------------|
 | `videoPath` | `string` | Path to the recorded MP4 file |
 | `opts.captions` | `Array` | Explicit captions (default: from last recording or `.captions.json`) |
-| `opts.provider` | `string` | `'edge'` (default) or `'openai'` |
+| `opts.provider` | `string` | `'edge'` (default), `'openai'`, or `'elevenlabs'` |
 | `opts.voice` | `string` | Voice name (provider-specific) |
 | `opts.apiKey` | `string` | API key (for openai) |
 | `opts.apiUrl` | `string` | Endpoint (for openai) |

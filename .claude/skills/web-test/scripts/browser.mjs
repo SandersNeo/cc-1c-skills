@@ -3154,10 +3154,34 @@ async function openaiTtsProvider(text, outputPath, opts = {}) {
   writeFileSync(outputPath, buf);
 }
 
+/**
+ * ElevenLabs TTS provider. Requires apiKey.
+ * @param {string} text — text to synthesize
+ * @param {string} outputPath — path for the output mp3 file
+ * @param {object} opts — { apiKey, apiUrl, voice, model }
+ */
+async function elevenlabsTtsProvider(text, outputPath, opts = {}) {
+  const voiceId = opts.voice || 'JBFqnCBsd6RMkjVDRZzb'; // George
+  const apiUrl = opts.apiUrl || `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`;
+  if (!opts.apiKey) throw new Error('ElevenLabs TTS requires apiKey');
+  const resp = await fetch(apiUrl, {
+    method: 'POST',
+    headers: { 'xi-api-key': opts.apiKey, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      text,
+      model_id: opts.model || 'eleven_multilingual_v2',
+    }),
+  });
+  if (!resp.ok) throw new Error(`ElevenLabs TTS error ${resp.status}: ${await resp.text()}`);
+  const buf = Buffer.from(await resp.arrayBuffer());
+  writeFileSync(outputPath, buf);
+}
+
 /** Get TTS provider function by name. */
 function getTtsProvider(name) {
   switch (name) {
     case 'openai': return openaiTtsProvider;
+    case 'elevenlabs': return elevenlabsTtsProvider;
     case 'edge': default: return edgeTtsProvider;
   }
 }
