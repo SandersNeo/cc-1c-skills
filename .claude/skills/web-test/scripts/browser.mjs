@@ -2057,19 +2057,24 @@ export async function fillTableRow(fields, { tab, add, row } = {}) {
     // If user specified a type, always clear and use type selection flow
     if (info.type) {
       await page.keyboard.press('Shift+F4');  // Clear cell to reset any inherited type
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(300);
       await page.keyboard.press('F4');
-      await page.waitForTimeout(1000);
-      const typeForm = await page.evaluate(`(() => {
-        const forms = {};
-        document.querySelectorAll('[id]').forEach(el => {
-          if (el.offsetWidth === 0 && el.offsetHeight === 0) return;
-          const m = el.id.match(/^form(\\d+)_/);
-          if (m) forms[m[1]] = true;
-        });
-        const nums = Object.keys(forms).map(Number).filter(n => n > ${formNum});
-        return nums.length > 0 ? Math.max(...nums) : null;
-      })()`);
+      // Poll for type dialog form to appear
+      let typeForm = null;
+      for (let tw = 0; tw < 6; tw++) {
+        await page.waitForTimeout(200);
+        typeForm = await page.evaluate(`(() => {
+          const forms = {};
+          document.querySelectorAll('[id]').forEach(el => {
+            if (el.offsetWidth === 0 && el.offsetHeight === 0) return;
+            const m = el.id.match(/^form(\\d+)_/);
+            if (m) forms[m[1]] = true;
+          });
+          const nums = Object.keys(forms).map(Number).filter(n => n > ${formNum});
+          return nums.length > 0 ? Math.max(...nums) : null;
+        })()`);
+        if (typeForm !== null) break;
+      }
       if (typeForm !== null && await isTypeDialog(typeForm)) {
         await pickFromTypeDialog(typeForm, info.type);
         await waitForStable(typeForm);
@@ -2085,22 +2090,10 @@ export async function fillTableRow(fields, { tab, add, row } = {}) {
           return nums.length > 0 ? Math.max(...nums) : null;
         })()`);
         if (selForm === null) {
-          // No selection form — primitive type (Number, Date, String).
-          // After type pick a popup may appear (with delay):
-          //   - Calculator (.calculate) for Number
-          //   - Calendar (.frameCalendar) for Date
-          //   - Direct INPUT for String
-          // Wait for popup, dismiss with Escape, then paste value.
-          await page.waitForTimeout(800);
-          let hasPopup = await page.evaluate(`(() => {
-            const calc = document.querySelector('.calculate');
-            if (calc && calc.offsetWidth > 0) return 'calculator';
-            const cal = document.querySelector('.frameCalendar');
-            if (cal && cal.offsetWidth > 0) return 'calendar';
-            return null;
-          })()`);
-          if (!hasPopup) {
-            await page.waitForTimeout(600);
+          // Primitive type — poll for calculator/calendar popup or settle on INPUT
+          let hasPopup = null;
+          for (let pw = 0; pw < 5; pw++) {
+            await page.waitForTimeout(200);
             hasPopup = await page.evaluate(`(() => {
               const calc = document.querySelector('.calculate');
               if (calc && calc.offsetWidth > 0) return 'calculator';
@@ -2108,17 +2101,29 @@ export async function fillTableRow(fields, { tab, add, row } = {}) {
               if (cal && cal.offsetWidth > 0) return 'calendar';
               return null;
             })()`);
+            if (hasPopup) break;
           }
           if (hasPopup) {
             await page.keyboard.press('Escape');
-            await page.waitForTimeout(500);
+            // Poll for popup to disappear
+            for (let dw = 0; dw < 4; dw++) {
+              await page.waitForTimeout(150);
+              const gone = await page.evaluate(`(() => {
+                const calc = document.querySelector('.calculate');
+                if (calc && calc.offsetWidth > 0) return false;
+                const cal = document.querySelector('.frameCalendar');
+                if (cal && cal.offsetWidth > 0) return false;
+                return true;
+              })()`);
+              if (gone) break;
+            }
           }
           // Ensure we are in an editable INPUT for this cell
-          const afterEl = await page.evaluate(`(() => {
+          const inInput = await page.evaluate(`(() => {
             const f = document.activeElement;
-            return { tag: f?.tagName, id: f?.id || '' };
+            return f && (f.tagName === 'INPUT' || f.tagName === 'TEXTAREA');
           })()`);
-          if (afterEl.tag !== 'INPUT' && afterEl.tag !== 'TEXTAREA') {
+          if (!inInput) {
             const cellRect = await page.evaluate(`(() => {
               const el = document.getElementById(${JSON.stringify(cell.id)});
               if (!el) return null;
@@ -2127,15 +2132,23 @@ export async function fillTableRow(fields, { tab, add, row } = {}) {
             })()`);
             if (cellRect) {
               await page.mouse.dblclick(cellRect.x, cellRect.y);
-              await page.waitForTimeout(500);
+              // Poll for INPUT focus
+              for (let fw = 0; fw < 4; fw++) {
+                await page.waitForTimeout(150);
+                const ok = await page.evaluate(`(() => {
+                  const f = document.activeElement;
+                  return f && (f.tagName === 'INPUT' || f.tagName === 'TEXTAREA');
+                })()`);
+                if (ok) break;
+              }
             }
           }
           await page.evaluate(`navigator.clipboard.writeText(${JSON.stringify(text)})`);
           await page.keyboard.press('Control+a');
           await page.keyboard.press('Control+v');
-          await page.waitForTimeout(500);
+          await page.waitForTimeout(400);
           await page.keyboard.press('Tab');
-          await page.waitForTimeout(500);
+          await page.waitForTimeout(300);
           info.filled = true;
           results.push({ field: matchedKey, cell: cell.fullName, ok: true, method: 'type-direct', type: info.type });
           continue;
@@ -2364,23 +2377,10 @@ export async function fillTableRow(fields, { tab, add, row } = {}) {
             return nums.length > 0 ? Math.max(...nums) : null;
           })()`);
           if (selForm === null) {
-            // No selection form — primitive type (Number, Date, String).
-            // After type pick a popup may appear (with delay):
-            //   - Calculator (.calculate) for Number
-            //   - Calendar (.frameCalendar) for Date
-            //   - Direct INPUT for String
-            // Wait for popup, dismiss with Escape, then paste value.
-            await page.waitForTimeout(800);
-            let hasPopup = await page.evaluate(`(() => {
-              const calc = document.querySelector('.calculate');
-              if (calc && calc.offsetWidth > 0) return 'calculator';
-              const cal = document.querySelector('.frameCalendar');
-              if (cal && cal.offsetWidth > 0) return 'calendar';
-              return null;
-            })()`);
-            if (!hasPopup) {
-              // Second check after extra wait
-              await page.waitForTimeout(600);
+            // Primitive type — poll for calculator/calendar popup or settle on INPUT
+            let hasPopup = null;
+            for (let pw = 0; pw < 5; pw++) {
+              await page.waitForTimeout(200);
               hasPopup = await page.evaluate(`(() => {
                 const calc = document.querySelector('.calculate');
                 if (calc && calc.offsetWidth > 0) return 'calculator';
@@ -2388,18 +2388,27 @@ export async function fillTableRow(fields, { tab, add, row } = {}) {
                 if (cal && cal.offsetWidth > 0) return 'calendar';
                 return null;
               })()`);
+              if (hasPopup) break;
             }
             if (hasPopup) {
               await page.keyboard.press('Escape');
-              await page.waitForTimeout(500);
+              for (let dw = 0; dw < 4; dw++) {
+                await page.waitForTimeout(150);
+                const gone = await page.evaluate(`(() => {
+                  const calc = document.querySelector('.calculate');
+                  if (calc && calc.offsetWidth > 0) return false;
+                  const cal = document.querySelector('.frameCalendar');
+                  if (cal && cal.offsetWidth > 0) return false;
+                  return true;
+                })()`);
+                if (gone) break;
+              }
             }
-            // Ensure we are in an editable INPUT for this cell
-            const afterEl = await page.evaluate(`(() => {
+            const inInput = await page.evaluate(`(() => {
               const f = document.activeElement;
-              return { tag: f?.tagName, id: f?.id || '' };
+              return f && (f.tagName === 'INPUT' || f.tagName === 'TEXTAREA');
             })()`);
-            if (afterEl.tag !== 'INPUT' && afterEl.tag !== 'TEXTAREA') {
-              // Focus lost — re-enter edit mode via dblclick
+            if (!inInput) {
               const cellRect = await page.evaluate(`(() => {
                 const el = document.getElementById(${JSON.stringify(cell.id)});
                 if (!el) return null;
@@ -2408,15 +2417,22 @@ export async function fillTableRow(fields, { tab, add, row } = {}) {
               })()`);
               if (cellRect) {
                 await page.mouse.dblclick(cellRect.x, cellRect.y);
-                await page.waitForTimeout(500);
+                for (let fw = 0; fw < 4; fw++) {
+                  await page.waitForTimeout(150);
+                  const ok = await page.evaluate(`(() => {
+                    const f = document.activeElement;
+                    return f && (f.tagName === 'INPUT' || f.tagName === 'TEXTAREA');
+                  })()`);
+                  if (ok) break;
+                }
               }
             }
             await page.evaluate(`navigator.clipboard.writeText(${JSON.stringify(text)})`);
             await page.keyboard.press('Control+a');
             await page.keyboard.press('Control+v');
-            await page.waitForTimeout(500);
+            await page.waitForTimeout(400);
             await page.keyboard.press('Tab');
-            await page.waitForTimeout(500);
+            await page.waitForTimeout(300);
             info.filled = true;
             results.push({ field: matchedKey, cell: cell.fullName, ok: true, method: 'type-direct', type: info.type });
             continue;
