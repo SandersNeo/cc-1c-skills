@@ -10,7 +10,7 @@ import sys
 from lxml import etree
 
 sys.stdout.reconfigure(encoding="utf-8")
-    sys.stderr.reconfigure(encoding="utf-8")
+sys.stderr.reconfigure(encoding="utf-8")
 
 # --- Argument parsing ---
 parser = argparse.ArgumentParser(description="Analyze 1C spreadsheet (MXL) structure", allow_abbrev=False)

@@ -8,7 +8,7 @@ import sys
 from lxml import etree
 
 sys.stdout.reconfigure(encoding="utf-8")
-    sys.stderr.reconfigure(encoding="utf-8")
+sys.stderr.reconfigure(encoding="utf-8")
 
 # ── arg parsing ──────────────────────────────────────────────
 
@@ -282,6 +282,8 @@ def format_single_type(raw, parent_node):
         return "УникальныйИдентификатор"
     if raw == "v8:Null":
         return "Null"
+    # Normalize d5p1:/dNpN: → cfg: (both map to same namespace)
+    raw = re.sub(r'^d\d+p\d+:', 'cfg:', raw)
     # cfg:CatalogRef.Xxx -> СправочникСсылка.Xxx
     m = re.match(r'^cfg:(\w+)Ref\.(.+)$', raw)
     if m:
@@ -410,6 +412,7 @@ def decline_cols(n):
 
 
 def format_source_type(raw):
+    raw = re.sub(r'^d\d+p\d+:', 'cfg:', raw)
     m = re.match(r'^cfg:(\w+)\.(.+)$', raw)
     if m:
         prefix = m.group(1)

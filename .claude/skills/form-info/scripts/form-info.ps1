@@ -58,8 +58,8 @@ function Format-Type($typeNode) {
 	$typeSet = $typeNode.SelectSingleNode("v8:TypeSet", $ns)
 	if ($typeSet) {
 		$val = $typeSet.InnerText
-		# Strip cfg: prefix for DefinedType, keep as-is
-		if ($val -like "cfg:*") { $val = $val.Substring(4) }
+		# Strip cfg:/d5p1: prefix for DefinedType, keep as-is
+		$val = $val -replace '^(cfg|d\d+p\d+):', ''
 		return $val
 	}
 
@@ -101,7 +101,7 @@ function Format-Type($typeNode) {
 				}
 			}
 			"xs:binary" { $parts += "binary" }
-			"cfg:*" { $parts += $raw.Substring(4) }
+			{ $_ -like "cfg:*" -or $_ -match '^d\d+p\d+:' } { $parts += ($raw -replace '^(cfg|d\d+p\d+):', '') }
 			"v8:ValueTable" { $parts += "ValueTable" }
 			"v8:ValueTree" { $parts += "ValueTree" }
 			"v8:ValueListType" { $parts += "ValueList" }

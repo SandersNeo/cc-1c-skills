@@ -9,7 +9,7 @@ from collections import OrderedDict
 from lxml import etree
 
 sys.stdout.reconfigure(encoding="utf-8")
-    sys.stderr.reconfigure(encoding="utf-8")
+sys.stderr.reconfigure(encoding="utf-8")
 
 # --- Argument parsing ---
 parser = argparse.ArgumentParser(description="Analyze 1C configuration structure", allow_abbrev=False)

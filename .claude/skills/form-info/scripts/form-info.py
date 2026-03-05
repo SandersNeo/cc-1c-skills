@@ -102,8 +102,8 @@ def format_type(type_node):
                 parts.append("dateTime")
         elif raw == "xs:binary":
             parts.append("binary")
-        elif raw.startswith("cfg:"):
-            parts.append(raw[4:])
+        elif raw.startswith("cfg:") or re.match(r'^d\d+p\d+:', raw):
+            parts.append(re.sub(r'^(?:cfg|d\d+p\d+):', '', raw))
         elif raw == "v8:ValueTable":
             parts.append("ValueTable")
         elif raw == "v8:ValueTree":
