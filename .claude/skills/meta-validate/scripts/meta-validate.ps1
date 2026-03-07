@@ -1160,6 +1160,100 @@ if ($propsNode -and $forbiddenProperties.ContainsKey($mdType)) {
 	Report-OK "12. Forbidden properties: N/A"
 }
 
+if ($script:stopped) { & $finalize; exit 1 }
+
+# --- Check 13: Method reference validation (EventSubscription.Handler, ScheduledJob.MethodName) ---
+
+if ($propsNode -and $mdType -in @("EventSubscription","ScheduledJob") -and $script:configDir) {
+	$check13Ok = $true
+	$methodRef = $null
+	$propLabel = $null
+
+	if ($mdType -eq "EventSubscription") {
+		$hNode = $propsNode.SelectSingleNode("md:Handler", $ns)
+		if ($hNode) { $methodRef = $hNode.InnerText.Trim() }
+		$propLabel = "Handler"
+	} elseif ($mdType -eq "ScheduledJob") {
+		$mNode = $propsNode.SelectSingleNode("md:MethodName", $ns)
+		if ($mNode) { $methodRef = $mNode.InnerText.Trim() }
+		$propLabel = "MethodName"
+	}
+
+	if ($methodRef) {
+		$parts = $methodRef.Split('.')
+		if ($parts.Count -ne 2) {
+			Report-Error "13. ${mdType}.${propLabel} = '$methodRef': expected format 'CommonModuleName.ProcedureName'"
+			$check13Ok = $false
+		} else {
+			$cmName = $parts[0]
+			$procName = $parts[1]
+			$cmXml = Join-Path (Join-Path $script:configDir "CommonModules") "$cmName.xml"
+			if (-not (Test-Path $cmXml)) {
+				Report-Error "13. ${mdType}.${propLabel}: CommonModule '$cmName' not found (expected $cmXml)"
+				$check13Ok = $false
+			} else {
+				# Check BSL file for exported procedure
+				$bslPath = Join-Path (Join-Path (Join-Path $script:configDir "CommonModules") $cmName) "Ext/Module.bsl"
+				if (Test-Path $bslPath) {
+					$bslContent = [System.IO.File]::ReadAllText($bslPath, [System.Text.Encoding]::UTF8)
+					# Match: Procedure/Function ProcName(...) Export or Процедура/Функция ProcName(...) Экспорт
+					$exportPattern = "(?mi)^[\s]*(Procedure|Function|Процедура|Функция)\s+$([regex]::Escape($procName))\s*\(.*\)\s+(Export|Экспорт)"
+					if (-not [regex]::IsMatch($bslContent, $exportPattern)) {
+						Report-Warn "13. ${mdType}.${propLabel}: procedure '$procName' not found as exported in CommonModule '$cmName'"
+						$check13Ok = $false
+					}
+				} else {
+					Report-Warn "13. ${mdType}.${propLabel}: BSL file not found ($bslPath), cannot verify procedure"
+				}
+			}
+		}
+	}
+
+	if ($check13Ok) {
+		Report-OK "13. Method reference: $propLabel = '$methodRef'"
+	}
+} else {
+	Report-OK "13. Method reference: N/A"
+}
+
+if ($script:stopped) { & $finalize; exit 1 }
+
+# --- Check 14: DocumentJournal Column content ---
+
+if ($mdType -eq "DocumentJournal" -and $childObjNode) {
+	$columns = $childObjNode.SelectNodes("md:Column", $ns)
+	$check14Ok = $true
+	$colCount = 0
+	$emptyRefCount = 0
+
+	foreach ($col in $columns) {
+		$colCount++
+		$colProps = $col.SelectSingleNode("md:Properties", $ns)
+		$colNameNode = if ($colProps) { $colProps.SelectSingleNode("md:Name", $ns) } else { $null }
+		$colName = if ($colNameNode) { $colNameNode.InnerText } else { "(unnamed)" }
+
+		$refs = if ($colProps) { $colProps.SelectSingleNode("md:References", $ns) } else { $null }
+		$hasItems = $false
+		if ($refs) {
+			$items = $refs.SelectNodes("xr:Item", $ns)
+			if ($items.Count -gt 0) { $hasItems = $true }
+		}
+		if (-not $hasItems) {
+			Report-Error "14. DocumentJournal Column '$colName': empty References (will fail on LoadConfigFromFiles)"
+			$check14Ok = $false
+			$emptyRefCount++
+		}
+	}
+
+	if ($check14Ok -and $colCount -gt 0) {
+		Report-OK "14. DocumentJournal Columns: $colCount column(s), all have References"
+	} elseif ($colCount -eq 0) {
+		Report-OK "14. DocumentJournal Columns: none"
+	}
+} else {
+	Report-OK "14. DocumentJournal Columns: N/A"
+}
+
 # --- Final output ---
 
 & $finalize

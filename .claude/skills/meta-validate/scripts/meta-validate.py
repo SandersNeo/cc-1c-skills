@@ -1082,6 +1082,94 @@ if props_node is not None and md_type in forbidden_properties:
 else:
     report_ok("12. Forbidden properties: N/A")
 
+if stopped:
+    finalize()
+    sys.exit(1)
+
+# ── Check 13: Method reference validation ─────────────────────
+
+if props_node is not None and md_type in ("EventSubscription", "ScheduledJob") and config_dir:
+    check13_ok = True
+    method_ref = None
+    prop_label = None
+
+    if md_type == "EventSubscription":
+        h_node = find(props_node, "md:Handler")
+        if h_node is not None:
+            method_ref = text_of(h_node)
+        prop_label = "Handler"
+    elif md_type == "ScheduledJob":
+        m_node = find(props_node, "md:MethodName")
+        if m_node is not None:
+            method_ref = text_of(m_node)
+        prop_label = "MethodName"
+
+    if method_ref:
+        parts = method_ref.split(".")
+        if len(parts) != 2:
+            report_error(f"13. {md_type}.{prop_label} = '{method_ref}': expected format 'CommonModuleName.ProcedureName'")
+            check13_ok = False
+        else:
+            cm_name = parts[0]
+            proc_name = parts[1]
+            cm_xml = os.path.join(config_dir, "CommonModules", f"{cm_name}.xml")
+            if not os.path.exists(cm_xml):
+                report_error(f"13. {md_type}.{prop_label}: CommonModule '{cm_name}' not found (expected {cm_xml})")
+                check13_ok = False
+            else:
+                # Check BSL file for exported procedure
+                bsl_path = os.path.join(config_dir, "CommonModules", cm_name, "Ext", "Module.bsl")
+                if os.path.exists(bsl_path):
+                    with open(bsl_path, "r", encoding="utf-8-sig") as f:
+                        bsl_content = f.read()
+                    export_pattern = rf"(?mi)^\s*(Procedure|Function|Процедура|Функция)\s+{re.escape(proc_name)}\s*\(.*\)\s+(Export|Экспорт)"
+                    if not re.search(export_pattern, bsl_content):
+                        report_warn(f"13. {md_type}.{prop_label}: procedure '{proc_name}' not found as exported in CommonModule '{cm_name}'")
+                        check13_ok = False
+                else:
+                    report_warn(f"13. {md_type}.{prop_label}: BSL file not found ({bsl_path}), cannot verify procedure")
+
+    if check13_ok:
+        report_ok(f"13. Method reference: {prop_label} = '{method_ref}'")
+else:
+    report_ok("13. Method reference: N/A")
+
+if stopped:
+    finalize()
+    sys.exit(1)
+
+# ── Check 14: DocumentJournal Column content ──────────────────
+
+if md_type == "DocumentJournal" and child_obj_node is not None:
+    columns = find_all(child_obj_node, "md:Column")
+    check14_ok = True
+    col_count = 0
+    empty_ref_count = 0
+
+    for col in columns:
+        col_count += 1
+        col_props = find(col, "md:Properties")
+        col_name_node = find(col_props, "md:Name") if col_props is not None else None
+        col_name = inner_text(col_name_node) if col_name_node is not None else "(unnamed)"
+
+        refs = find(col_props, "md:References") if col_props is not None else None
+        has_items = False
+        if refs is not None:
+            items = find_all(refs, "xr:Item")
+            if len(items) > 0:
+                has_items = True
+        if not has_items:
+            report_error(f"14. DocumentJournal Column '{col_name}': empty References (will fail on LoadConfigFromFiles)")
+            check14_ok = False
+            empty_ref_count += 1
+
+    if check14_ok and col_count > 0:
+        report_ok(f"14. DocumentJournal Columns: {col_count} column(s), all have References")
+    elif col_count == 0:
+        report_ok("14. DocumentJournal Columns: none")
+else:
+    report_ok("14. DocumentJournal Columns: N/A")
+
 # ── Final output ──────────────────────────────────────────────
 
 finalize()
