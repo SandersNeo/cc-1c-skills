@@ -52,10 +52,22 @@ def main():
     # --- Resolve V8Path ---
     v8path = resolve_v8path(args.V8Path)
 
-    # --- Validate connection ---
+    # --- Auto-create stub database if no connection specified ---
+    auto_created_base = None
     if not args.InfoBasePath and (not args.InfoBaseServer or not args.InfoBaseRef):
-        print("Error: specify -InfoBasePath or -InfoBaseServer + -InfoBaseRef", file=sys.stderr)
-        sys.exit(1)
+        source_dir = os.path.dirname(os.path.abspath(args.SourceFile))
+        auto_base_path = os.path.join(tempfile.gettempdir(), f"epf_stub_db_{random.randint(0, 999999)}")
+        stub_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "stub-db-create.py")
+        print("No database specified. Creating temporary stub database...")
+        result = subprocess.run(
+            [sys.executable, stub_script, "-SourceDir", source_dir, "-V8Path", v8path, "-TempBasePath", auto_base_path],
+            capture_output=False,
+        )
+        if result.returncode != 0:
+            print("Error: failed to create stub database", file=sys.stderr)
+            sys.exit(1)
+        args.InfoBasePath = auto_base_path
+        auto_created_base = auto_base_path
 
     # --- Validate source file ---
     if not os.path.isfile(args.SourceFile):
@@ -123,6 +135,8 @@ def main():
     finally:
         if os.path.exists(temp_dir):
             shutil.rmtree(temp_dir, ignore_errors=True)
+        if auto_created_base and os.path.exists(auto_created_base):
+            shutil.rmtree(auto_created_base, ignore_errors=True)
 
 
 if __name__ == "__main__":

@@ -58,10 +58,21 @@ def main():
     # --- Resolve V8Path ---
     v8path = resolve_v8path(args.V8Path)
 
-    # --- Validate connection ---
+    # --- Auto-create empty database if no connection specified ---
+    auto_created_base = None
     if not args.InfoBasePath and (not args.InfoBaseServer or not args.InfoBaseRef):
-        print("Error: specify -InfoBasePath or -InfoBaseServer + -InfoBaseRef", file=sys.stderr)
-        sys.exit(1)
+        auto_base_path = os.path.join(tempfile.gettempdir(), f"epf_dump_db_{random.randint(0, 999999)}")
+        print("No database specified. Creating temporary empty database...")
+        print("WARNING: Reference types (CatalogRef, DocumentRef, etc.) will be lost - converted to strings. Use a real database to preserve types.")
+        result = subprocess.run(
+            [v8path, "CREATEINFOBASE", f'File={auto_base_path}', "/DisableStartupDialogs"],
+            capture_output=True, text=True,
+        )
+        if result.returncode != 0:
+            print("Error: failed to create temporary database", file=sys.stderr)
+            sys.exit(1)
+        args.InfoBasePath = auto_base_path
+        auto_created_base = auto_base_path
 
     # --- Validate input file ---
     if not os.path.isfile(args.InputFile):
@@ -129,6 +140,8 @@ def main():
     finally:
         if os.path.exists(temp_dir):
             shutil.rmtree(temp_dir, ignore_errors=True)
+        if auto_created_base and os.path.exists(auto_created_base):
+            shutil.rmtree(auto_created_base, ignore_errors=True)
 
 
 if __name__ == "__main__":
