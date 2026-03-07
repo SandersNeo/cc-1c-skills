@@ -421,12 +421,13 @@ $script:generatedTypes = @{
 		@{ prefix = "AccumulationRegisterRecordKey"; category = "RecordKey" }
 	)
 	"AccountingRegister" = @(
-		@{ prefix = "AccountingRegisterRecord";    category = "Record" }
-		@{ prefix = "AccountingRegisterManager";   category = "Manager" }
-		@{ prefix = "AccountingRegisterSelection"; category = "Selection" }
-		@{ prefix = "AccountingRegisterList";      category = "List" }
-		@{ prefix = "AccountingRegisterRecordSet"; category = "RecordSet" }
-		@{ prefix = "AccountingRegisterRecordKey"; category = "RecordKey" }
+		@{ prefix = "AccountingRegisterRecord";         category = "Record" }
+		@{ prefix = "AccountingRegisterExtDimensions";  category = "ExtDimensions" }
+		@{ prefix = "AccountingRegisterRecordSet";      category = "RecordSet" }
+		@{ prefix = "AccountingRegisterRecordKey";      category = "RecordKey" }
+		@{ prefix = "AccountingRegisterSelection";      category = "Selection" }
+		@{ prefix = "AccountingRegisterList";           category = "List" }
+		@{ prefix = "AccountingRegisterManager";        category = "Manager" }
 	)
 	"CalculationRegister" = @(
 		@{ prefix = "CalculationRegisterRecord";    category = "Record" }
@@ -444,11 +445,12 @@ $script:generatedTypes = @{
 		@{ prefix = "ChartOfAccountsManager";   category = "Manager" }
 	)
 	"ChartOfCharacteristicTypes" = @(
-		@{ prefix = "ChartOfCharacteristicTypesObject";    category = "Object" }
-		@{ prefix = "ChartOfCharacteristicTypesRef";       category = "Ref" }
-		@{ prefix = "ChartOfCharacteristicTypesSelection"; category = "Selection" }
-		@{ prefix = "ChartOfCharacteristicTypesList";      category = "List" }
-		@{ prefix = "ChartOfCharacteristicTypesManager";   category = "Manager" }
+		@{ prefix = "ChartOfCharacteristicTypesObject";         category = "Object" }
+		@{ prefix = "ChartOfCharacteristicTypesRef";            category = "Ref" }
+		@{ prefix = "ChartOfCharacteristicTypesSelection";      category = "Selection" }
+		@{ prefix = "ChartOfCharacteristicTypesList";           category = "List" }
+		@{ prefix = "ChartOfCharacteristicTypesCharacteristic"; category = "Characteristic" }
+		@{ prefix = "ChartOfCharacteristicTypesManager";        category = "Manager" }
 	)
 	"ChartOfCalculationTypes" = @(
 		@{ prefix = "ChartOfCalculationTypesObject";    category = "Object" }
@@ -457,15 +459,19 @@ $script:generatedTypes = @{
 		@{ prefix = "ChartOfCalculationTypesList";      category = "List" }
 		@{ prefix = "ChartOfCalculationTypesManager";   category = "Manager" }
 		@{ prefix = "DisplacingCalculationTypes";       category = "DisplacingCalculationTypes" }
+		@{ prefix = "DisplacingCalculationTypesRow";    category = "DisplacingCalculationTypesRow" }
 		@{ prefix = "BaseCalculationTypes";             category = "BaseCalculationTypes" }
+		@{ prefix = "BaseCalculationTypesRow";          category = "BaseCalculationTypesRow" }
 		@{ prefix = "LeadingCalculationTypes";          category = "LeadingCalculationTypes" }
+		@{ prefix = "LeadingCalculationTypesRow";       category = "LeadingCalculationTypesRow" }
 	)
 	"BusinessProcess" = @(
-		@{ prefix = "BusinessProcessObject";    category = "Object" }
-		@{ prefix = "BusinessProcessRef";       category = "Ref" }
-		@{ prefix = "BusinessProcessSelection"; category = "Selection" }
-		@{ prefix = "BusinessProcessList";      category = "List" }
-		@{ prefix = "BusinessProcessManager";   category = "Manager" }
+		@{ prefix = "BusinessProcessObject";        category = "Object" }
+		@{ prefix = "BusinessProcessRef";            category = "Ref" }
+		@{ prefix = "BusinessProcessSelection";      category = "Selection" }
+		@{ prefix = "BusinessProcessList";           category = "List" }
+		@{ prefix = "BusinessProcessManager";        category = "Manager" }
+		@{ prefix = "BusinessProcessRoutePointRef";  category = "RoutePointRef" }
 	)
 	"Task" = @(
 		@{ prefix = "TaskObject";    category = "Object" }

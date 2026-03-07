@@ -192,7 +192,7 @@ GT_DEFS = {
     'Task': [('TaskObject','Object'),('TaskRef','Ref'),('TaskSelection','Selection'),('TaskList','List'),('TaskManager','Manager')],
     'InformationRegister': [('InformationRegisterRecord','Record'),('InformationRegisterManager','Manager'),('InformationRegisterSelection','Selection'),('InformationRegisterList','List'),('InformationRegisterRecordSet','RecordSet'),('InformationRegisterRecordKey','RecordKey'),('InformationRegisterRecordManager','RecordManager')],
     'AccumulationRegister': [('AccumulationRegisterRecord','Record'),('AccumulationRegisterManager','Manager'),('AccumulationRegisterSelection','Selection'),('AccumulationRegisterList','List'),('AccumulationRegisterRecordSet','RecordSet'),('AccumulationRegisterRecordKey','RecordKey')],
-    'AccountingRegister': [('AccountingRegisterRecord','Record'),('AccountingRegisterManager','Manager'),('AccountingRegisterSelection','Selection'),('AccountingRegisterExtDimensionTypes','ExtDimensionTypes'),('AccountingRegisterList','List'),('AccountingRegisterRecordSet','RecordSet'),('AccountingRegisterRecordKey','RecordKey')],
+    'AccountingRegister': [('AccountingRegisterRecord','Record'),('AccountingRegisterManager','Manager'),('AccountingRegisterSelection','Selection'),('AccountingRegisterExtDimensions','ExtDimensions'),('AccountingRegisterList','List'),('AccountingRegisterRecordSet','RecordSet'),('AccountingRegisterRecordKey','RecordKey')],
     'CalculationRegister': [('CalculationRegisterRecord','Record'),('CalculationRegisterManager','Manager'),('CalculationRegisterSelection','Selection'),('CalculationRegisterList','List'),('CalculationRegisterRecordSet','RecordSet'),('CalculationRegisterRecordKey','RecordKey')],
     'DefinedType': [('DefinedType','DefinedType')],
 }

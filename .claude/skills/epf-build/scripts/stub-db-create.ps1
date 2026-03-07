@@ -239,7 +239,7 @@ if ($hasRefTypes) {
 		)
 		"AccountingRegister" = @(
 			@{p="AccountingRegisterRecord";c="Record"},@{p="AccountingRegisterManager";c="Manager"},
-			@{p="AccountingRegisterSelection";c="Selection"},@{p="AccountingRegisterExtDimensionTypes";c="ExtDimensionTypes"},
+			@{p="AccountingRegisterSelection";c="Selection"},@{p="AccountingRegisterExtDimensions";c="ExtDimensions"},
 			@{p="AccountingRegisterList";c="List"},@{p="AccountingRegisterRecordSet";c="RecordSet"},
 			@{p="AccountingRegisterRecordKey";c="RecordKey"}
 		)
