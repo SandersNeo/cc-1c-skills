@@ -345,9 +345,20 @@ function Parse-AttributeShorthand {
 
 	# Object form
 	$name = "$($val.name)"
+	# Build type string combining type + length/precision from separate JSON fields
+	$typeStr = if ($val.type) { "$($val.type)" } else { "" }
+	if ($typeStr -and -not $typeStr.Contains('(')) {
+		if ($typeStr -eq "String" -and $val.length) {
+			$typeStr = "String($($val.length))"
+		} elseif ($typeStr -eq "Number" -and $val.length) {
+			$prec = if ($val.precision) { $val.precision } else { 0 }
+			$nn = if ($val.nonneg -or $val.nonnegative) { ",nonneg" } else { "" }
+			$typeStr = "Number($($val.length),$prec$nn)"
+		}
+	}
 	return @{
 		name    = $name
-		type    = if ($val.type) { "$($val.type)" } else { "" }
+		type    = $typeStr
 		synonym = if ($val.synonym) { "$($val.synonym)" } else { Split-CamelCase $name }
 		comment = if ($val.comment) { "$($val.comment)" } else { "" }
 		flags   = @(if ($val.flags) { $val.flags } else { @() })
@@ -1078,7 +1089,7 @@ function Emit-DocumentProperties {
 	if ($regRecords.Count -gt 0) {
 		X "$i<RegisterRecords>"
 		foreach ($rr in $regRecords) {
-			X "$i`t<xr:Record>$rr</xr:Record>"
+			X "$i`t<xr:Item xsi:type=`"xr:MDObjectRef`">$rr</xr:Item>"
 		}
 		X "$i</RegisterRecords>"
 	} else {
@@ -1139,8 +1150,17 @@ function Emit-ConstantProperties {
 	Emit-MLText $i "Synonym" $synonym
 	X "$i<Comment/>"
 
-	# Type
+	# Type — combine valueType + length/precision from separate JSON fields
 	$valueType = if ($def.valueType) { "$($def.valueType)" } else { "String" }
+	if ($valueType -and -not $valueType.Contains('(')) {
+		if ($valueType -eq "String" -and $def.length) {
+			$valueType = "String($($def.length))"
+		} elseif ($valueType -eq "Number" -and $def.length) {
+			$p = if ($def.precision) { $def.precision } else { 0 }
+			$nn = if ($def.nonneg -or $def.nonnegative) { ",nonneg" } else { "" }
+			$valueType = "Number($($def.length),$p$nn)"
+		}
+	}
 	Emit-ValueType $i $valueType
 
 	X "$i<UseStandardCommands>true</UseStandardCommands>"
@@ -1265,10 +1285,12 @@ function Emit-DefinedTypeProperties {
 	Emit-MLText $i "Synonym" $synonym
 	X "$i<Comment/>"
 
-	# Type — composite type with multiple v8:Type entries
+	# Type — composite type with multiple v8:Type entries (accept both valueType and valueTypes)
 	$valueTypes = @()
 	if ($def.valueTypes) {
 		$valueTypes = @($def.valueTypes)
+	} elseif ($def.valueType) {
+		$valueTypes = @($def.valueType)
 	}
 	if ($valueTypes.Count -gt 0) {
 		X "$i<Type>"
@@ -1345,6 +1367,10 @@ function Emit-ScheduledJobProperties {
 	X "$i<Comment/>"
 
 	$methodName = if ($def.methodName) { "$($def.methodName)" } else { "" }
+	# Ensure CommonModule. prefix
+	if ($methodName -and -not $methodName.StartsWith("CommonModule.")) {
+		$methodName = "CommonModule.$methodName"
+	}
 	X "$i<MethodName>$(Esc-Xml $methodName)</MethodName>"
 
 	$description = if ($def.description) { "$($def.description)" } else { $synonym }
@@ -1391,6 +1417,10 @@ function Emit-EventSubscriptionProperties {
 	X "$i<Event>$event</Event>"
 
 	$handler = if ($def.handler) { "$($def.handler)" } else { "" }
+	# Ensure CommonModule. prefix
+	if ($handler -and -not $handler.StartsWith("CommonModule.")) {
+		$handler = "CommonModule.$handler"
+	}
 	X "$i<Handler>$(Esc-Xml $handler)</Handler>"
 }
 
@@ -1556,7 +1586,7 @@ function Emit-ChartOfCharacteristicTypesProperties {
 		X "$i`t<v8:Type>xs:boolean</v8:Type>"
 		X "$i`t<v8:Type>xs:string</v8:Type>"
 		X "$i`t<v8:StringQualifiers>"
-		X "$i`t`t<v8:Length>0</v8:Length>"
+		X "$i`t`t<v8:Length>100</v8:Length>"
 		X "$i`t`t<v8:AllowedLength>Variable</v8:AllowedLength>"
 		X "$i`t</v8:StringQualifiers>"
 		X "$i`t<v8:Type>xs:decimal</v8:Type>"

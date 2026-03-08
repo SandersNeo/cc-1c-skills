@@ -320,9 +320,18 @@ def parse_attribute_shorthand(val):
         return parsed
     # Object form
     name = str(val.get('name', ''))
+    # Build type string combining type + length/precision from separate JSON fields
+    type_str = str(val['type']) if val.get('type') else ''
+    if type_str and '(' not in type_str:
+        if type_str == 'String' and val.get('length'):
+            type_str = f"String({val['length']})"
+        elif type_str == 'Number' and val.get('length'):
+            prec = val.get('precision', 0)
+            nn = ',nonneg' if val.get('nonneg') or val.get('nonnegative') else ''
+            type_str = f"Number({val['length']},{prec}{nn})"
     return {
         'name': name,
-        'type': str(val['type']) if val.get('type') else '',
+        'type': type_str,
         'synonym': str(val['synonym']) if val.get('synonym') else split_camel_case(name),
         'comment': str(val['comment']) if val.get('comment') else '',
         'flags': list(val.get('flags', [])),
@@ -968,7 +977,7 @@ def emit_document_properties(indent):
     if reg_records:
         X(f'{i}<RegisterRecords>')
         for rr in reg_records:
-            X(f'{i}\t<xr:Record>{rr}</xr:Record>')
+            X(f'{i}\t<xr:Item xsi:type="xr:MDObjectRef">{rr}</xr:Item>')
         X(f'{i}</RegisterRecords>')
     else:
         X(f'{i}<RegisterRecords/>')
@@ -1014,7 +1023,15 @@ def emit_constant_properties(indent):
     X(f'{i}<Name>{esc_xml(obj_name)}</Name>')
     emit_mltext(i, 'Synonym', synonym)
     X(f'{i}<Comment/>')
+    # Type — combine valueType + length/precision from separate JSON fields
     value_type = str(defn['valueType']) if defn.get('valueType') else 'String'
+    if value_type and '(' not in value_type:
+        if value_type == 'String' and defn.get('length'):
+            value_type = f"String({defn['length']})"
+        elif value_type == 'Number' and defn.get('length'):
+            prec = defn.get('precision', 0)
+            nn = ',nonneg' if defn.get('nonneg') or defn.get('nonnegative') else ''
+            value_type = f"Number({defn['length']},{prec}{nn})"
     emit_value_type(i, value_type)
     X(f'{i}<UseStandardCommands>true</UseStandardCommands>')
     X(f'{i}<DefaultForm/>')
@@ -1111,7 +1128,11 @@ def emit_defined_type_properties(indent):
     X(f'{i}<Name>{esc_xml(obj_name)}</Name>')
     emit_mltext(i, 'Synonym', synonym)
     X(f'{i}<Comment/>')
+    # Accept both valueType and valueTypes
     value_types = list(defn.get('valueTypes', []))
+    if not value_types and defn.get('valueType'):
+        vt_raw = defn['valueType']
+        value_types = list(vt_raw) if isinstance(vt_raw, list) else [vt_raw]
     if value_types:
         X(f'{i}<Type>')
         for vt in value_types:
@@ -1182,6 +1203,9 @@ def emit_scheduled_job_properties(indent):
     emit_mltext(i, 'Synonym', synonym)
     X(f'{i}<Comment/>')
     method_name = str(defn['methodName']) if defn.get('methodName') else ''
+    # Ensure CommonModule. prefix
+    if method_name and not method_name.startswith('CommonModule.'):
+        method_name = f'CommonModule.{method_name}'
     X(f'{i}<MethodName>{esc_xml(method_name)}</MethodName>')
     description = str(defn['description']) if defn.get('description') else synonym
     X(f'{i}<Description>{esc_xml(description)}</Description>')
@@ -1213,6 +1237,9 @@ def emit_event_subscription_properties(indent):
     event = str(defn['event']) if defn.get('event') else 'BeforeWrite'
     X(f'{i}<Event>{event}</Event>')
     handler = str(defn['handler']) if defn.get('handler') else ''
+    # Ensure CommonModule. prefix
+    if handler and not handler.startswith('CommonModule.'):
+        handler = f'CommonModule.{handler}'
     X(f'{i}<Handler>{esc_xml(handler)}</Handler>')
 
 # --- 13b. Report, DataProcessor ---
@@ -1366,7 +1393,7 @@ def emit_chart_of_characteristic_types_properties(indent):
         X(f'{i}\t<v8:Type>xs:boolean</v8:Type>')
         X(f'{i}\t<v8:Type>xs:string</v8:Type>')
         X(f'{i}\t<v8:StringQualifiers>')
-        X(f'{i}\t\t<v8:Length>0</v8:Length>')
+        X(f'{i}\t\t<v8:Length>100</v8:Length>')
         X(f'{i}\t\t<v8:AllowedLength>Variable</v8:AllowedLength>')
         X(f'{i}\t</v8:StringQualifiers>')
         X(f'{i}\t<v8:Type>xs:decimal</v8:Type>')

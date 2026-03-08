@@ -1181,12 +1181,20 @@ if ($propsNode -and $mdType -in @("EventSubscription","ScheduledJob") -and $scri
 
 	if ($methodRef) {
 		$parts = $methodRef.Split('.')
-		if ($parts.Count -ne 2) {
-			Report-Error "13. ${mdType}.${propLabel} = '$methodRef': expected format 'CommonModuleName.ProcedureName'"
-			$check13Ok = $false
-		} else {
+		# Format: CommonModule.ModuleName.ProcedureName (3 parts) or ModuleName.ProcedureName (2 parts, legacy)
+		if ($parts.Count -eq 3 -and $parts[0] -eq "CommonModule") {
+			$cmName = $parts[1]
+			$procName = $parts[2]
+		} elseif ($parts.Count -eq 2) {
 			$cmName = $parts[0]
 			$procName = $parts[1]
+		} else {
+			Report-Error "13. ${mdType}.${propLabel} = '$methodRef': expected format 'CommonModule.ModuleName.ProcedureName'"
+			$check13Ok = $false
+			$cmName = $null
+			$procName = $null
+		}
+		if ($cmName) {
 			$cmXml = Join-Path (Join-Path $script:configDir "CommonModules") "$cmName.xml"
 			if (-not (Test-Path $cmXml)) {
 				Report-Error "13. ${mdType}.${propLabel}: CommonModule '$cmName' not found (expected $cmXml)"

@@ -1106,12 +1106,19 @@ if props_node is not None and md_type in ("EventSubscription", "ScheduledJob") a
 
     if method_ref:
         parts = method_ref.split(".")
-        if len(parts) != 2:
-            report_error(f"13. {md_type}.{prop_label} = '{method_ref}': expected format 'CommonModuleName.ProcedureName'")
-            check13_ok = False
-        else:
+        # Format: CommonModule.ModuleName.ProcedureName (3 parts) or ModuleName.ProcedureName (2 parts, legacy)
+        if len(parts) == 3 and parts[0] == "CommonModule":
+            cm_name = parts[1]
+            proc_name = parts[2]
+        elif len(parts) == 2:
             cm_name = parts[0]
             proc_name = parts[1]
+        else:
+            report_error(f"13. {md_type}.{prop_label} = '{method_ref}': expected format 'CommonModule.ModuleName.ProcedureName'")
+            check13_ok = False
+            cm_name = None
+            proc_name = None
+        if cm_name:
             cm_xml = os.path.join(config_dir, "CommonModules", f"{cm_name}.xml")
             if not os.path.exists(cm_xml):
                 report_error(f"13. {md_type}.{prop_label}: CommonModule '{cm_name}' not found (expected {cm_xml})")
