@@ -42,7 +42,11 @@ Constant (Константа), DefinedType (ОпределяемыйТип), Com
 
 ## JSON DSL — краткий справочник
 
-Полная спецификация: `docs/meta-dsl-spec.md`.
+Детали по типам — в справочных файлах (читай нужный при компиляции конкретного типа):
+- `reference/types-basic.md` — Catalog, Document, Enum, Constant, DefinedType, Report, DataProcessor
+- `reference/types-registers.md` — InformationRegister, AccumulationRegister, AccountingRegister, CalculationRegister, ChartOfAccounts, ChartOfCharacteristicTypes, ChartOfCalculationTypes
+- `reference/types-process.md` — BusinessProcess, Task, ExchangePlan, CommonModule, ScheduledJob, EventSubscription, DocumentJournal
+- `reference/types-web.md` — HTTPService, WebService
 
 ### Корневая структура
 
