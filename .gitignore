@@ -34,8 +34,15 @@ __pycache__/
 *.mp4
 
 # Навыки, скопированные для других AI-платформ (генерируются scripts/switch.py)
+.agents/
+.augment/
+.cline/
 .codex/
-.cursor/skills/
-.github/skills/
+.cursor/
 .gemini/
+.github/skills/
+.kilocode/
+.kiro/
 .opencode/
+.roo/
+.windsurf/
