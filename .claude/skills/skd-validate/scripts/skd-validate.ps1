@@ -1,8 +1,10 @@
-﻿# skd-validate v1.0 — Validate 1C DCS structure
+﻿# skd-validate v1.1 — Validate 1C DCS structure
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[Parameter(Mandatory)]
 	[string]$TemplatePath,
+
+	[switch]$Detailed,
 
 	[int]$MaxErrors = 20,
 
@@ -33,6 +35,7 @@ $fileName = [System.IO.Path]::GetFileName($resolvedPath)
 
 $script:errors = 0
 $script:warnings = 0
+$script:okCount = 0
 $script:stopped = $false
 $script:output = New-Object System.Text.StringBuilder 4096
 
@@ -43,7 +46,8 @@ function Out-Line {
 
 function Report-OK {
 	param([string]$msg)
-	Out-Line "[OK]    $msg"
+	$script:okCount++
+	if ($Detailed) { Out-Line "[OK]    $msg" }
 }
 
 function Report-Error {
@@ -62,10 +66,14 @@ function Report-Warn {
 }
 
 $finalize = {
-	Out-Line ""
-	Out-Line "=== Result: $($script:errors) errors, $($script:warnings) warnings ==="
-
-	$result = $script:output.ToString()
+	$checks = $script:okCount + $script:errors + $script:warnings
+	if ($script:errors -eq 0 -and $script:warnings -eq 0 -and -not $Detailed) {
+		$result = "=== Validation OK: $fileName ($checks checks) ==="
+	} else {
+		Out-Line ""
+		Out-Line "=== Result: $($script:errors) errors, $($script:warnings) warnings ($checks checks) ==="
+		$result = $script:output.ToString()
+	}
 	Write-Host $result
 
 	if ($OutFile) {

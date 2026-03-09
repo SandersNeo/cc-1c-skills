@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# role-validate v1.0 — Validate 1C role Rights.xml structure
+# role-validate v1.1 — Validate 1C role Rights.xml structure
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 """Validates role Rights.xml: root element, global flags, objects, rights, RLS, templates."""
 import sys, os, argparse, re
@@ -182,6 +182,8 @@ def main():
     parser.add_argument('-RightsPath', dest='RightsPath', required=True)
     parser.add_argument('-MetadataPath', dest='MetadataPath', default='')
     parser.add_argument('-OutFile', dest='OutFile', default='')
+    parser.add_argument('-Detailed', dest='Detailed', action='store_true')
+    parser.add_argument('-MaxErrors', dest='MaxErrors', type=int, default=30)
     args = parser.parse_args()
 
     rights_path = args.RightsPath
@@ -195,41 +197,45 @@ def main():
     lines = []
     errors = 0
     warnings = 0
+    ok_count = 0
+    stopped = False
 
-    def out_ok(msg):
-        lines.append(f'  OK  {msg}')
+    def report_ok(msg):
+        nonlocal ok_count
+        ok_count += 1
+        if args.Detailed:
+            lines.append(f'[OK]    {msg}')
 
-    def out_warn(msg):
+    def report_warn(msg):
         nonlocal warnings
         warnings += 1
-        lines.append(f'  WARN  {msg}')
+        lines.append(f'[WARN]  {msg}')
 
-    def out_err(msg):
-        nonlocal errors
+    def report_error(msg):
+        nonlocal errors, stopped
         errors += 1
-        lines.append(f'  ERR  {msg}')
+        lines.append(f'[ERROR] {msg}')
+        if errors >= args.MaxErrors:
+            stopped = True
 
     # --- 3. Validate Rights.xml ---
-    lines.append(f'Validating: {rights_path}')
 
-    def finalize():
-        lines.append('---')
-        lines.append(f'Result: {errors} error(s), {warnings} warning(s)')
-        output = '\n'.join(lines)
+    def write_output(text):
         if out_file:
             out_path = out_file if os.path.isabs(out_file) else os.path.join(os.getcwd(), out_file)
             out_dir = os.path.dirname(out_path)
             if out_dir and not os.path.exists(out_dir):
                 os.makedirs(out_dir, exist_ok=True)
             with open(out_path, 'w', encoding='utf-8-sig', newline='') as f:
-                f.write(output)
-            print(f'[OK] Validation result written to: {out_path}')
+                f.write(text)
+            print(f'Written to: {out_path}')
         else:
-            print(output)
+            print(text)
 
     if not os.path.exists(rights_path):
-        out_err(f'File not found: {rights_path}')
-        finalize()
+        report_error(f'File not found: {rights_path}')
+        result = '\n'.join(lines)
+        write_output(result)
         sys.exit(1)
 
     # 3a. Parse XML
@@ -237,10 +243,11 @@ def main():
     try:
         xml_parser = etree.XMLParser(remove_blank_text=False)
         xml_doc = etree.parse(rights_path, xml_parser)
-        out_ok('XML well-formed')
+        report_ok('XML well-formed')
     except etree.XMLSyntaxError as e:
-        out_err(f'XML parse error: {e}')
-        finalize()
+        report_error(f'XML parse error: {e}')
+        result = '\n'.join(lines)
+        write_output(result)
         sys.exit(1)
 
     root = xml_doc.getroot()
@@ -249,11 +256,11 @@ def main():
 
     # 3b. Check root element
     if root_local != 'Rights':
-        out_err(f"Root element is '{root_local}', expected 'Rights'")
+        report_error(f"Root element is '{root_local}', expected 'Rights'")
     elif root_ns != RIGHTS_NS:
-        out_warn(f"Namespace is '{root_ns}', expected '{RIGHTS_NS}'")
+        report_warn(f"Namespace is '{root_ns}', expected '{RIGHTS_NS}'")
     else:
-        out_ok('Root element: <Rights> with correct namespace')
+        report_ok('Root element: <Rights> with correct namespace')
 
     # 3c. Global flags
     flag_names = ['setForNewObjects', 'setForAttributesByDefault', 'independentRightsOfChildObjects']
@@ -263,12 +270,12 @@ def main():
         if len(nodes) > 0:
             val = nodes[0].text or ''
             if val not in ('true', 'false'):
-                out_warn(f"{fn} = '{val}' (expected 'true' or 'false')")
+                report_warn(f"{fn} = '{val}' (expected 'true' or 'false')")
             flags_found += 1
         else:
-            out_warn(f'Missing global flag: {fn}')
+            report_warn(f'Missing global flag: {fn}')
     if flags_found == 3:
-        out_ok('3 global flags present')
+        report_ok('3 global flags present')
 
     # 3d. Objects
     objects = root.findall(f'{{{RIGHTS_NS}}}object')
@@ -286,7 +293,7 @@ def main():
                 break
 
         if not obj_name:
-            out_err('Object without <name>')
+            report_error('Object without <name>')
             continue
 
         object_type = get_object_type(obj_name)
@@ -294,7 +301,7 @@ def main():
 
         # Check object type is known
         if not is_nested and object_type not in KNOWN_RIGHTS:
-            out_warn(f"{obj_name}: unknown object type '{object_type}'")
+            report_warn(f"{obj_name}: unknown object type '{object_type}'")
 
         # Check rights
         for child in obj:
@@ -325,14 +332,14 @@ def main():
                     # Check condition not empty
                     cond_node = get_child_el(rc, 'condition', RIGHTS_NS)
                     if cond_node is None or not (cond_node.text or ''):
-                        out_warn(f"{obj_name}: RLS condition for '{r_name}' is empty")
+                        report_warn(f"{obj_name}: RLS condition for '{r_name}' is empty")
 
             if not r_name:
-                out_err(f'{obj_name}: <right> without <name>')
+                report_error(f'{obj_name}: <right> without <name>')
                 continue
 
             if r_value not in ('true', 'false'):
-                out_err(f"{obj_name}: right '{r_name}' has invalid value '{r_value}'")
+                report_error(f"{obj_name}: right '{r_name}' has invalid value '{r_value}'")
                 continue
 
             right_count += 1
@@ -341,23 +348,23 @@ def main():
             if is_nested:
                 if '.Command.' in obj_name:
                     if r_name not in COMMAND_RIGHTS:
-                        out_warn(f"{obj_name}: '{r_name}' not valid for commands (only: View)")
+                        report_warn(f"{obj_name}: '{r_name}' not valid for commands (only: View)")
                 elif '.IntegrationServiceChannel.' in obj_name:
                     if r_name not in CHANNEL_RIGHTS:
-                        out_warn(f"{obj_name}: '{r_name}' not valid for channels (only: Use)")
+                        report_warn(f"{obj_name}: '{r_name}' not valid for channels (only: Use)")
                 else:
                     if r_name not in NESTED_RIGHTS:
-                        out_warn(f"{obj_name}: '{r_name}' not valid for nested objects (only: View, Edit)")
+                        report_warn(f"{obj_name}: '{r_name}' not valid for nested objects (only: View, Edit)")
             elif object_type in KNOWN_RIGHTS:
                 valid_rights = KNOWN_RIGHTS[object_type]
                 if r_name not in valid_rights:
                     similar = find_similar(r_name, valid_rights)
                     sug_str = f' Did you mean: {", ".join(similar)}?' if similar else ''
-                    out_warn(f"{obj_name}: unknown right '{r_name}'.{sug_str}")
+                    report_warn(f"{obj_name}: unknown right '{r_name}'.{sug_str}")
 
-    out_ok(f'{obj_count} objects, {right_count} rights')
+    report_ok(f'{obj_count} objects, {right_count} rights')
     if rls_count > 0:
-        out_ok(f'{rls_count} RLS restrictions')
+        report_ok(f'{rls_count} RLS restrictions')
 
     # 3e. Templates
     templates = root.findall(f'{{{RIGHTS_NS}}}restrictionTemplate')
@@ -378,14 +385,14 @@ def main():
                 elif local == 'condition':
                     t_cond = child.text or ''
             if not t_name:
-                out_warn('Restriction template without <name>')
+                report_warn('Restriction template without <name>')
             else:
                 paren_idx = t_name.find('(')
                 short_name = t_name[:paren_idx] if paren_idx > 0 else t_name
                 tpl_names.append(short_name)
             if not t_cond:
-                out_warn(f"Template '{t_name}': empty <condition>")
-        out_ok(f'{len(templates)} templates: {", ".join(tpl_names)}')
+                report_warn(f"Template '{t_name}': empty <condition>")
+        report_ok(f'{len(templates)} templates: {", ".join(tpl_names)}')
 
     # --- 4. Validate metadata (optional) ---
     inferred_role_name = ''
@@ -396,7 +403,7 @@ def main():
             metadata_path = os.path.join(os.getcwd(), metadata_path)
 
         if not os.path.exists(metadata_path):
-            out_err(f'Metadata file not found: {metadata_path}')
+            report_error(f'Metadata file not found: {metadata_path}')
         else:
             try:
                 meta_parser = etree.XMLParser(remove_blank_text=False)
@@ -410,13 +417,13 @@ def main():
                         break
 
                 if role_node is None:
-                    out_err('Metadata: <Role> element not found')
+                    report_error('Metadata: <Role> element not found')
                 else:
                     uuid_val = role_node.get('uuid', '')
                     if GUID_PATTERN.match(uuid_val):
-                        out_ok(f'Metadata: UUID valid ({uuid_val})')
+                        report_ok(f'Metadata: UUID valid ({uuid_val})')
                     else:
-                        out_err(f"Metadata: invalid UUID format '{uuid_val}'")
+                        report_error(f"Metadata: invalid UUID format '{uuid_val}'")
 
                     # Find Name
                     name_node = None
@@ -426,10 +433,10 @@ def main():
                             break
 
                     if name_node is not None and name_node.text:
-                        out_ok(f'Metadata: Name = {name_node.text}')
+                        report_ok(f'Metadata: Name = {name_node.text}')
                         inferred_role_name = name_node.text
                     else:
-                        out_err('Metadata: <Name> is empty or missing')
+                        report_error('Metadata: <Name> is empty or missing')
 
                     # Find Synonym
                     syn_node = None
@@ -439,11 +446,11 @@ def main():
                             break
 
                     if syn_node is not None and len(syn_node) > 0:
-                        out_ok('Metadata: Synonym present')
+                        report_ok('Metadata: Synonym present')
                     else:
-                        out_warn('Metadata: <Synonym> is empty')
+                        report_warn('Metadata: <Synonym> is empty')
             except etree.XMLSyntaxError as e:
-                out_err(f'Metadata XML parse error: {e}')
+                report_error(f'Metadata XML parse error: {e}')
 
     # --- 5. Check registration in Configuration.xml ---
     resolved_rights = os.path.abspath(rights_path)
@@ -487,14 +494,25 @@ def main():
                         found = True
                         break
                 if found:
-                    out_ok(f'Configuration.xml: <Role>{inferred_role_name}</Role> registered')
+                    report_ok(f'Configuration.xml: <Role>{inferred_role_name}</Role> registered')
                 else:
-                    out_warn(f'Configuration.xml: <Role>{inferred_role_name}</Role> NOT found in ChildObjects')
+                    report_warn(f'Configuration.xml: <Role>{inferred_role_name}</Role> NOT found in ChildObjects')
         except etree.XMLSyntaxError as e:
-            out_warn(f'Configuration.xml: parse error \u2014 {e}')
+            report_warn(f'Configuration.xml: parse error \u2014 {e}')
 
     # --- 6. Summary ---
-    finalize()
+
+    # Insert header at position 0
+    lines.insert(0, f'=== Validation: Role.{inferred_role_name} ===')
+
+    checks = ok_count + errors + warnings
+    if errors == 0 and warnings == 0 and not args.Detailed:
+        result = f'=== Validation OK: Role.{inferred_role_name} ({checks} checks) ==='
+    else:
+        lines.append('')
+        lines.append(f'=== Result: {errors} errors, {warnings} warnings ({checks} checks) ===')
+        result = '\n'.join(lines)
+    write_output(result)
     sys.exit(1 if errors > 0 else 0)
 
 

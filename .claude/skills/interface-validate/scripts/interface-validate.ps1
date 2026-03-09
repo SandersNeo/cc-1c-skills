@@ -1,7 +1,8 @@
-﻿# interface-validate v1.0 — Validate 1C CommandInterface.xml structure
+﻿# interface-validate v1.1 — Validate 1C CommandInterface.xml structure
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[Parameter(Mandatory)][string]$CIPath,
+	[switch]$Detailed,
 	[int]$MaxErrors = 30,
 	[string]$OutFile
 )
@@ -33,11 +34,15 @@ if (-not $contextName) { $contextName = "Root" }
 $script:errors = 0
 $script:warnings = 0
 $script:stopped = $false
+$script:okCount = 0
 $script:output = New-Object System.Text.StringBuilder 8192
 $script:allCommandNames = @()
 
 function Out-Line([string]$msg) { $script:output.AppendLine($msg) | Out-Null }
-function Report-OK([string]$msg) { Out-Line "[OK]    $msg" }
+function Report-OK([string]$msg) {
+	$script:okCount++
+	if ($Detailed) { Out-Line "[OK]    $msg" }
+}
 function Report-Error([string]$msg) {
 	$script:errors++
 	Out-Line "[ERROR] $msg"
@@ -358,16 +363,20 @@ if (-not $script:stopped) {
 			$shown = $badRefs[0..([Math]::Min(4, $badRefs.Count - 1))]
 			Report-Warn "13. Command reference format: $($badRefs.Count) unrecognized: $($shown -join ', ')$(if($badRefs.Count -gt 5){' ...'})"
 		}
-	} else {
-		Report-OK "13. Command reference format: n/a (no commands)"
 	}
 }
 
 # --- Finalize ---
-Out-Line "---"
-Out-Line "Errors: $($script:errors), Warnings: $($script:warnings)"
+$checks = $script:okCount + $script:errors + $script:warnings
 
-$result = $script:output.ToString()
+if ($script:errors -eq 0 -and $script:warnings -eq 0 -and -not $Detailed) {
+	$result = "=== Validation OK: CommandInterface ($contextName) ($checks checks) ==="
+} else {
+	Out-Line ""
+	Out-Line "=== Result: $($script:errors) errors, $($script:warnings) warnings ($checks checks) ==="
+	$result = $script:output.ToString()
+}
+
 Write-Host $result
 
 if ($OutFile) {

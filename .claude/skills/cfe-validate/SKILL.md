@@ -1,24 +1,34 @@
 ---
 name: cfe-validate
 description: Валидация расширения конфигурации 1С (CFE). Используй после создания или модификации расширения для проверки корректности
-argument-hint: <ExtensionPath> [-MaxErrors 30]
+argument-hint: <ExtensionPath> [-Detailed] [-MaxErrors 30]
 allowed-tools:
   - Bash
   - Read
   - Glob
 ---
 
-# /cfe-validate — Валидация расширения конфигурации
+# /cfe-validate — валидация расширения конфигурации (CFE)
 
 Проверяет структурную корректность расширения: XML-формат, свойства, состав, заимствованные объекты. Аналог `/cf-validate`, но для расширений.
 
+## Использование
+
+```
+/cfe-validate <ExtensionPath>
+/cfe-validate src                        — каталог расширения
+```
+
+`ExtensionPath` авторезолв: если указана директория — ищет `Configuration.xml`.
+
 ## Параметры
 
-| Параметр | Описание | По умолчанию |
-|----------|----------|--------------|
-| `ExtensionPath` | Путь к каталогу или Configuration.xml расширения (обязат.) | — |
-| `MaxErrors` | Лимит ошибок | 30 |
-| `OutFile` | Записать результат в файл | — |
+| Параметр      | Обяз. | Умолч. | Описание                                        |
+|---------------|:-----:|---------|-------------------------------------------------|
+| ExtensionPath | да    | —       | Путь к каталогу или Configuration.xml расширения |
+| Detailed      | нет   | —       | Показывать [OK] для каждой проверки              |
+| MaxErrors     | нет   | 30      | Остановиться после N ошибок                      |
+| OutFile       | нет   | —       | Записать результат в файл                        |
 
 ## Команда
 
@@ -40,12 +50,4 @@ powershell.exe -NoProfile -File .claude/skills/cfe-validate/scripts/cfe-validate
 | 8 | Каталоги объектов существуют | WARN |
 | 9 | Заимствованные объекты: ObjectBelonging=Adopted, ExtendedConfigurationObject UUID | ERROR/WARN |
 
-## Пример вывода
-
-```
-=== Validation: Extension.МоёРасширение ===
-[OK]    1. Root structure: MetaDataObject/Configuration, version 2.17
-[OK]    2. InternalInfo: 7 ContainedObject, all ClassIds valid
-...
-=== Result: 0 errors, 0 warnings ===
-```
+Exit code: 0 = OK, 1 = есть ошибки. По умолчанию краткий вывод. `-Detailed` для поштучной детализации.

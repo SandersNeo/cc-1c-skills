@@ -1,8 +1,10 @@
-﻿# form-validate v1.0 — Validate 1C managed form
+﻿# form-validate v1.1 — Validate 1C managed form
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[Parameter(Mandatory)]
 	[string]$FormPath,
+
+	[switch]$Detailed,
 
 	[int]$MaxErrors = 30
 )
@@ -40,10 +42,12 @@ $root = $xmlDoc.DocumentElement
 $errors = 0
 $warnings = 0
 $stopped = $false
+$script:okCount = 0
 
 function Report-OK {
 	param([string]$msg)
-	Write-Host "[OK]    $msg"
+	$script:okCount++
+	if ($Detailed) { Write-Host "[OK]    $msg" }
 }
 
 function Report-Error {
@@ -73,8 +77,10 @@ if ($parentDir) {
 	}
 }
 
-Write-Host "=== Validation: $formName ==="
-Write-Host ""
+if ($Detailed) {
+	Write-Host "=== Validation: $formName ==="
+	Write-Host ""
+}
 
 # Early BaseForm detection (used in Check 5 to skip base element DataPath validation)
 $hasBaseForm = ($root.SelectSingleNode("f:BaseForm", $nsMgr) -ne $null)
@@ -642,18 +648,22 @@ if (-not $stopped -and -not $isExtension) {
 
 # --- Summary ---
 
-Write-Host ""
-Write-Host "---"
-Write-Host "Total: $($allElements.Count) elements, $($attrNodes.Count) attributes, $($cmdNodes.Count) commands"
+$checks = $script:okCount + $errors + $warnings
 
-if ($stopped) {
-	Write-Host "Stopped after $MaxErrors errors. Fix and re-run."
-}
-
-if ($errors -eq 0 -and $warnings -eq 0) {
-	Write-Host "All checks passed."
+if ($errors -eq 0 -and $warnings -eq 0 -and -not $Detailed) {
+	Write-Host "=== Validation OK: Form.$formName ($checks checks) ==="
 } else {
-	Write-Host "Errors: $errors, Warnings: $warnings"
+	Write-Host ""
+	if ($Detailed) {
+		Write-Host "---"
+		Write-Host "Total: $($allElements.Count) elements, $($attrNodes.Count) attributes, $($cmdNodes.Count) commands"
+	}
+
+	if ($stopped) {
+		Write-Host "Stopped after $MaxErrors errors. Fix and re-run."
+	}
+
+	Write-Host "=== Result: $errors errors, $warnings warnings ($checks checks) ==="
 }
 
 if ($errors -gt 0) {
