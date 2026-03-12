@@ -3579,7 +3579,37 @@ export async function highlight(text, opts = {}) {
     }
   }
 
-  // 3. Fallback: sections (sidebar navigation)
+  // 3. Form groups/panels (containers with title text or matching ID name)
+  if (!elId) {
+    const formNum = elId === null ? await page.evaluate(detectFormScript()) : null;
+    if (formNum !== null) {
+      elId = await page.evaluate(`(() => {
+        const norm = s => (s?.trim().replace(/\\u00a0/g, ' ') || '').replace(/ё/gi, 'е');
+        const target = ${JSON.stringify(normYo(text.toLowerCase()))};
+        const p = 'form' + ${formNum} + '_';
+        // Collect visible group containers — _container or _div elements
+        const groups = [...document.querySelectorAll('[id^="' + p + '"][id$="_container"], [id^="' + p + '"][id$="_div"]')]
+          .filter(el => el.offsetWidth > 0 && el.offsetHeight > 0);
+        const items = groups.map(el => {
+          const idName = el.id.replace(p, '').replace(/_(container|div)$/, '');
+          // Try to find a visible title/label for this group
+          const titleEl = document.getElementById(p + idName + '#title_text')
+            || document.getElementById(p + idName + '_title_text');
+          const label = norm(titleEl?.innerText || '').toLowerCase();
+          const name = norm(idName).toLowerCase();
+          return { id: el.id, name, label };
+        });
+        // Fuzzy match: exact label → exact name → startsWith → includes
+        let found = items.find(i => i.label === target);
+        if (!found) found = items.find(i => i.name === target);
+        if (!found) found = items.find(i => i.label.startsWith(target) || i.name.startsWith(target));
+        if (!found) found = items.find(i => i.label.includes(target) || i.name.includes(target));
+        return found ? found.id : null;
+      })()`);
+    }
+  }
+
+  // 4. Fallback: sections (sidebar navigation)
   if (!elId) {
     elId = await page.evaluate(`(() => {
       const norm = s => (s?.trim().replace(/\\u00a0/g, ' ') || '').replace(/ё/gi, 'е');

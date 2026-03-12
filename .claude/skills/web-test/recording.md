@@ -137,10 +137,11 @@ Manually highlight a UI element by name (fuzzy match). Places a semi-transparent
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `text` | string | Element name — button, link, field, section, or command |
+| `text` | string | Element name — button, link, field, group/panel, section, or command |
 
 - Fuzzy match order: exact → startsWith → includes
-- Searches form elements first, then sections/commands
+- Search priority: popup items → commands → form elements (buttons, fields) → **form groups/panels** → sections
+- Groups are matched by visible title or internal name (e.g., `highlight('Оргструктура')` finds the group panel)
 - `pointer-events: none` — does not block clicks
 
 ### `unhighlight()`
