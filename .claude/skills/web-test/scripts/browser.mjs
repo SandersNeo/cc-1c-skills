@@ -1441,7 +1441,7 @@ export async function fillFields(fields) {
 }
 
 /** Click a button/hyperlink/tab on the current form. Use {dblclick: true} to double-click (open items from lists). */
-export async function clickElement(text, { dblclick, table } = {}) {
+export async function clickElement(text, { dblclick, table, toggle } = {}) {
   ensureConnected();
   await dismissPendingErrors();
   if (highlightMode) try { await highlight(text, { table }); await page.waitForTimeout(500); await unhighlight(); } catch {}
@@ -1557,39 +1557,48 @@ export async function clickElement(text, { dblclick, table } = {}) {
     return state;
   }
   if (target.kind === 'gridTreeNode') {
-    // Tree node: click the tree expand/collapse icon [tree="true"] for toggle
-    const treeIconCoords = await page.evaluate(`(() => {
-      const p = ${JSON.stringify(`form${formNum}_`)};
-      const gridSel = ${JSON.stringify(target.gridId ? '#' + target.gridId : null)};
-      const grid = gridSel ? document.querySelector(gridSel) : document.querySelector('[id^="' + p + '"].grid');
-      const body = grid?.querySelector('.gridBody');
-      if (!body) return null;
-      const lines = [...body.querySelectorAll('.gridLine')];
-      for (const line of lines) {
-        const textBoxes = [...line.querySelectorAll('.gridBoxText')].filter(b => b.offsetWidth > 0);
-        const text = textBoxes[0]?.innerText?.trim() || '';
-        if (text.toLowerCase().replace(/ё/gi, 'е') === ${JSON.stringify(target.name.toLowerCase().replace(/ё/gi, 'е'))}) {
-          const treeIcon = line.querySelector('.gridBoxImg [tree="true"]');
-          if (treeIcon) {
-            const r = treeIcon.getBoundingClientRect();
-            return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) };
+    if (toggle) {
+      // Toggle: click the tree expand/collapse icon [tree="true"]
+      const treeIconCoords = await page.evaluate(`(() => {
+        const p = ${JSON.stringify(`form${formNum}_`)};
+        const gridSel = ${JSON.stringify(target.gridId ? '#' + target.gridId : null)};
+        const grid = gridSel ? document.querySelector(gridSel) : document.querySelector('[id^="' + p + '"].grid');
+        const body = grid?.querySelector('.gridBody');
+        if (!body) return null;
+        const lines = [...body.querySelectorAll('.gridLine')];
+        for (const line of lines) {
+          const textBoxes = [...line.querySelectorAll('.gridBoxText')].filter(b => b.offsetWidth > 0);
+          const text = textBoxes[0]?.innerText?.trim() || '';
+          if (text.toLowerCase().replace(/ё/gi, 'е') === ${JSON.stringify(target.name.toLowerCase().replace(/ё/gi, 'е'))}) {
+            const treeIcon = line.querySelector('.gridBoxImg [tree="true"]');
+            if (treeIcon) {
+              const r = treeIcon.getBoundingClientRect();
+              return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) };
+            }
           }
         }
+        return null;
+      })()`);
+      if (treeIconCoords) {
+        await page.mouse.click(treeIconCoords.x, treeIconCoords.y);
+      } else {
+        // Fallback: select row and use +/- keys
+        await page.mouse.click(target.x, target.y);
+        await page.waitForTimeout(300);
+        await page.keyboard.press('NumpadAdd');
       }
-      return null;
-    })()`);
-    if (treeIconCoords) {
-      await page.mouse.click(treeIconCoords.x, treeIconCoords.y);
-    } else {
-      // Fallback: select row and use +/- keys
-      await page.mouse.click(target.x, target.y);
-      await page.waitForTimeout(300);
-      await page.keyboard.press('NumpadAdd');
+      await waitForStable(formNum);
+      const state = await getFormState();
+      state.clicked = { kind: 'gridTreeNode', name: target.name, toggled: true };
+      state.hint = 'Tree node toggled. Use readTable to see updated tree.';
+      return state;
     }
+    // Default: select row (click text, no expand/collapse)
+    await page.mouse.click(target.x, target.y);
     await waitForStable(formNum);
     const state = await getFormState();
     state.clicked = { kind: 'gridTreeNode', name: target.name };
-    state.hint = 'Tree node toggled. Use web_table to see updated tree.';
+    state.hint = 'Row selected. Use { toggle: true } to expand/collapse.';
     return state;
   }
   if (target.kind === 'gridRow') {
