@@ -204,7 +204,10 @@ const READ_FORM_FN = `function readForm(p) {
         });
       }
       const rowCount = body ? body.querySelectorAll('.gridLine').length : 0;
-      return { name, columns, rowCount };
+      // Visual label from group title (e.g. "Входящие:" for grid "Входящие")
+      const titleEl = document.getElementById(p + name + '#title_div');
+      const label = titleEl ? (titleEl.innerText?.trim().replace(/:\\s*$/, '').replace(/\\u00a0/g, ' ') || null) : null;
+      return { name, columns, rowCount, ...(label ? { label } : {}) };
     });
     result.tables = tables;
     // Backward compat: table = first grid summary
@@ -391,13 +394,20 @@ export function resolveGridScript(formNum, tableName) {
           if (text) columns.push(text);
         });
       }
-      return { idx, gridId, gridName, columns, el: g };
+      // Visual label from group title element
+      const titleEl = document.getElementById(p + gridName + '#title_div');
+      const label = titleEl ? (titleEl.innerText?.trim().replace(/:\s*$/, '').replace(/\u00a0/g, ' ') || '') : '';
+      return { idx, gridId, gridName, label, columns, el: g };
     });
     // 1. Exact gridName match (case-insensitive)
     let found = infos.find(i => norm(i.gridName).toLowerCase() === target);
-    // 2. gridName contains target
+    // 2. Exact label match
+    if (!found) found = infos.find(i => i.label && norm(i.label).toLowerCase() === target);
+    // 3. gridName contains target
     if (!found) found = infos.find(i => norm(i.gridName).toLowerCase().includes(target));
-    // 3. Any column contains target
+    // 4. Label contains target
+    if (!found) found = infos.find(i => i.label && norm(i.label).toLowerCase().includes(target));
+    // 5. Any column contains target
     if (!found) found = infos.find(i => i.columns.some(c => norm(c).toLowerCase().includes(target)));
     if (found) {
       return {
@@ -411,7 +421,7 @@ export function resolveGridScript(formNum, tableName) {
     return {
       error: 'not_found',
       message: 'Table "' + ${JSON.stringify(tableName)} + '" not found',
-      available: infos.map(i => ({ name: i.gridName, columns: i.columns }))
+      available: infos.map(i => ({ name: i.gridName, ...(i.label ? { label: i.label } : {}), columns: i.columns }))
     };
   })()`;
 }

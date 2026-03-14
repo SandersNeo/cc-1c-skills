@@ -123,7 +123,7 @@ Returns current form structure. This is the primary way to understand what's on 
 
 **fields** — each field has: `name`, `value`, `label?`, `actions?` (select, clear, open), `required?` (true for unfilled mandatory fields)
 
-**tables** — array of all visible grids: `[{ name, columns, rowCount }]`. Use `readTable()` for actual data.
+**tables** — array of all visible grids: `[{ name, columns, rowCount, label? }]`. `label` is the visual group title shown on screen (e.g. "Входящие"), absent when grid has no visible title. Use `readTable()` for actual data.
 
 **table** — backward-compatible alias for the first grid: `{ present, columns, rowCount }`.
 
@@ -387,8 +387,8 @@ Some forms have multiple grids (e.g. "Входящие" and "Исходящие"
 const form = await getFormState();
 // form.tables = [
 //   { name: "ДеревоБизнесПроцессов", columns: ["Полный код", "Бизнес-процесс"], rowCount: 21 },
-//   { name: "Входящие", columns: ["Объект", "Бизнес-процесс источник", ...], rowCount: 1 },
-//   { name: "Исходящие", columns: ["Объект", "Бизнес-процесс приемник", ...], rowCount: 1 }
+//   { name: "Входящие", label: "Входящие", columns: ["Объект", "Бизнес-процесс источник", ...], rowCount: 1 },
+//   { name: "Исходящие", label: "Исходящие", columns: ["Объект", "Бизнес-процесс приемник", ...], rowCount: 1 }
 // ]
 ```
 
@@ -407,7 +407,7 @@ await clickElement('Добавить', { table: 'Входящие' });
 await deleteTableRow(0, { table: 'Исходящие' });
 ```
 
-Table name matching is fuzzy: `'Исходящие'` matches grid id `form1_Исходящие`. If the grid id is technical (e.g. `ТаблицаТоваров`), use that name — it's from `tables[].name`, not the visual label.
+Table matching accepts both technical name (`tables[].name`) and visual label (`tables[].label`). Label is the group title shown on screen — useful when working from screenshots. Name match takes priority over label match.
 
 ### Keyboard shortcuts (via `page.keyboard.press`)
 
