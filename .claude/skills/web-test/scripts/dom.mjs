@@ -685,31 +685,37 @@ export function findClickTargetScript(formNum, text, { tableName, gridSelector }
     }
 
     // Grid rows — fallback: search in table rows (for hierarchical/tree navigation)
-    const grid = document.querySelector('[id^="' + p + '"].grid');
-    if (grid) {
+    // Search ALL visible grids (or specific grid when table parameter is set)
+    let grids;
+    if (gridSelector) {
+      const g = document.querySelector(gridSelector);
+      grids = g ? [g] : [];
+    } else {
+      grids = [...document.querySelectorAll('[id^="' + p + '"].grid')].filter(g => g.offsetWidth > 0);
+    }
+    for (const grid of grids) {
       const body = grid.querySelector('.gridBody');
-      if (body) {
-        const lines = [...body.querySelectorAll('.gridLine')];
-        for (const line of lines) {
-          const textBoxes = [...line.querySelectorAll('.gridBoxText')].filter(b => b.offsetWidth > 0);
-          const rowTexts = textBoxes.map(b => b.innerText?.trim() || '').filter(Boolean);
-          const firstCell = rowTexts[0]?.toLowerCase() || '';
-          const rowText = rowTexts.join(' ').toLowerCase();
-          if (firstCell === target || rowText === target || (target.length >= 4 && (firstCell.includes(target) || rowText.includes(target)))) {
-            const imgBox = line.querySelector('.gridBoxImg');
-            const isGroup = imgBox?.querySelector('.gridListH') !== null;
-            const isParent = imgBox?.querySelector('.gridListV') !== null;
-            const isTreeNode = line.querySelector('.gridBoxTree') !== null;
-            const hasChildren = imgBox?.querySelector('[tree="true"]') !== null;
-            let kind;
-            if (isGroup) kind = 'gridGroup';
-            else if (isParent) kind = 'gridParent';
-            else if (isTreeNode && hasChildren) kind = 'gridTreeNode';
-            else kind = 'gridRow';
-            const r = line.getBoundingClientRect();
-            return { id: '', kind, name: rowTexts[0] || '',
-              x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) };
-          }
+      if (!body) continue;
+      const lines = [...body.querySelectorAll('.gridLine')];
+      for (const line of lines) {
+        const textBoxes = [...line.querySelectorAll('.gridBoxText')].filter(b => b.offsetWidth > 0);
+        const rowTexts = textBoxes.map(b => b.innerText?.trim() || '').filter(Boolean);
+        const firstCell = rowTexts[0]?.toLowerCase() || '';
+        const rowText = rowTexts.join(' ').toLowerCase();
+        if (firstCell === target || rowText === target || (target.length >= 4 && (firstCell.includes(target) || rowText.includes(target)))) {
+          const imgBox = line.querySelector('.gridBoxImg');
+          const isGroup = imgBox?.querySelector('.gridListH') !== null;
+          const isParent = imgBox?.querySelector('.gridListV') !== null;
+          const isTreeNode = line.querySelector('.gridBoxTree') !== null;
+          const hasChildren = imgBox?.querySelector('[tree="true"]') !== null;
+          let kind;
+          if (isGroup) kind = 'gridGroup';
+          else if (isParent) kind = 'gridParent';
+          else if (isTreeNode && hasChildren) kind = 'gridTreeNode';
+          else kind = 'gridRow';
+          const r = line.getBoundingClientRect();
+          return { id: '', kind, name: rowTexts[0] || '', gridId: grid.id,
+            x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) };
         }
       }
     }

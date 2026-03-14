@@ -1560,7 +1560,8 @@ export async function clickElement(text, { dblclick, table } = {}) {
     // Tree node: click the tree expand/collapse icon [tree="true"] for toggle
     const treeIconCoords = await page.evaluate(`(() => {
       const p = ${JSON.stringify(`form${formNum}_`)};
-      const grid = document.querySelector('[id^="' + p + '"].grid');
+      const gridSel = ${JSON.stringify(target.gridId ? '#' + target.gridId : null)};
+      const grid = gridSel ? document.querySelector(gridSel) : document.querySelector('[id^="' + p + '"].grid');
       const body = grid?.querySelector('.gridBody');
       if (!body) return null;
       const lines = [...body.querySelectorAll('.gridLine')];
