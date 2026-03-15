@@ -3639,7 +3639,7 @@ export async function startRecording(outputPath, opts = {}) {
  * @returns {{ file: string, duration: number, size: number }}
  */
 export async function stopRecording() {
-  if (!recorder) throw new Error('Not recording. Call startRecording() first.');
+  if (!recorder) return { file: null, duration: 0, size: 0 };
 
   const { cdp, ffmpeg, startTime, outputPath } = recorder;
 
@@ -3790,6 +3790,7 @@ export function getCaptions() {
  * @returns {{ file: string, duration: number, size: number, captions: number, warnings?: string[] }}
  */
 export async function addNarration(videoPath, opts = {}) {
+  if (!videoPath) return { file: null, duration: 0, size: 0, captions: 0 };
   const ffmpegPath = resolveFfmpeg(opts.ffmpegPath);
   const ttsProvider = getTtsProvider(opts.provider || 'edge');
   const ttsOpts = { voice: opts.voice, apiKey: opts.apiKey, apiUrl: opts.apiUrl, model: opts.model };
