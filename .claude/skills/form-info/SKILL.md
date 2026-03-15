@@ -27,20 +27,4 @@ powershell.exe -NoProfile -File .claude/skills/form-info/scripts/form-info.ps1 -
 | Limit    | нет | Макс. строк (по умолчанию 150) |
 | Offset   | нет | Пропустить N строк (пагинация) |
 
-## Легенда вывода
-
-**Элементы**: `[Group:V]` `[Group:H]` `[Group:AH]` `[Group:AV]` — UsualGroup с ориентацией; `[Input]` `[Check]` `[Label]` `[LabelField]` `[Table]` `[Button]` `[Pages]` `[Page]` `[CmdBar]` `[Popup]` `[Picture]` `[PicField]` `[BtnGroup]` `[Calendar]`
-
-**Флаги**: `[visible:false]` `[enabled:false]` `[ro]` `,collapse`
-
-**Привязки**: `-> Объект.Поле` (DataPath), `-> Команда [cmd]` (команда формы), `-> Close [std]` (стандартная)
-
-**События**: `{OnChange, StartChoice}`, для расширений `{OnChange[Before]}`
-
-**Заголовок**: `[title:Текст]` — только если отличается от имени
-
-**Реквизиты**: `*` и `(main)` — основной; `DynamicList -> Table` — MainTable; `ValueTable [col: type, ...]` — колонки
-
-**Параметры**: `(key)` — ключевой
-
-**Расширения**: `[EXTENSION]` в заголовке, `[callType]` на событиях/командах, `BaseForm: present (version X)` в конце
+Вывод самодокументирован. `[Group:AH]`/`[Group:AV]` = AlwaysHorizontal/AlwaysVertical.
