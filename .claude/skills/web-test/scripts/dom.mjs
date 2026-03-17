@@ -686,7 +686,9 @@ export function findClickTargetScript(formNum, text, { tableName, gridSelector }
       }
       return false;
     }).forEach(el => {
-      items.push({ id: el.id, name: el.dataset.content, label: '', kind: 'tab' });
+      const r = el.getBoundingClientRect();
+      items.push({ id: el.id, name: el.dataset.content, label: '', kind: 'tab',
+        x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) });
     });
 
     // Navigation panel items (FormNavigationPanel) — in parent page{N}
@@ -724,7 +726,7 @@ export function findClickTargetScript(formNum, text, { tableName, gridSelector }
         if (!cf) cf = containerItems.find(i => i.label && i.label.toLowerCase() === target);
         if (!cf && target.length >= 4) cf = containerItems.find(i => i.name.toLowerCase().includes(target));
         if (!cf && target.length >= 4) cf = containerItems.find(i => i.label && i.label.toLowerCase().includes(target));
-        if (cf) return { id: cf.id, kind: cf.kind, name: cf.name };
+        if (cf) { const res = { id: cf.id, kind: cf.kind, name: cf.name }; if (cf.x != null) { res.x = cf.x; res.y = cf.y; } return res; }
         // Fallback: filter by gridName id-prefix (e.g. ИсходящиеКоманднаяПанель_Добавить)
         const gridName = gridEl.id ? gridEl.id.replace(p, '') : '';
         if (gridName) {
@@ -732,7 +734,7 @@ export function findClickTargetScript(formNum, text, { tableName, gridSelector }
           let pf = prefixItems.find(i => i.name.toLowerCase() === target);
           if (!pf && target.length >= 4) pf = prefixItems.find(i => i.label && i.label.toLowerCase().includes(target));
           if (!pf && target.length >= 4) pf = prefixItems.find(i => i.name.toLowerCase().includes(target));
-          if (pf) return { id: pf.id, kind: pf.kind, name: pf.name };
+          if (pf) { const res = { id: pf.id, kind: pf.kind, name: pf.name }; if (pf.x != null) { res.x = pf.x; res.y = pf.y; } return res; }
         }
       }
       // Fall through to unscoped search
@@ -749,7 +751,9 @@ export function findClickTargetScript(formNum, text, { tableName, gridSelector }
     if (!found && target.length >= 4) found = items.find(i => i.label && i.label.toLowerCase().includes(target));
 
     if (found) {
-      return { id: found.id, kind: found.kind, name: found.name };
+      const res = { id: found.id, kind: found.kind, name: found.name };
+      if (found.x != null) { res.x = found.x; res.y = found.y; }
+      return res;
     }
 
     // Grid rows — fallback: search in table rows (for hierarchical/tree navigation)

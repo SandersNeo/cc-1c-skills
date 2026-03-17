@@ -1619,31 +1619,32 @@ export async function clickElement(text, { dblclick, table, toggle, expand } = {
     return state;
   }
 
-  // Build selector: tabs without ID use [data-content], others use [id]
-  const selector = (target.kind === 'tab' && !target.id)
-    ? `[data-content="${target.name}"]`
-    : `[id="${target.id}"]`;
-
-  // Use Playwright click for proper mousedown/mouseup events
-  try {
-    await page.click(selector, { timeout: 5000 });
-  } catch (clickErr) {
-    if (clickErr.message.includes('intercepts pointer events')) {
-      // Surface overlay intercepts — try force click first (no side effects),
-      // then Escape + retry as fallback (Escape can trigger save dialogs on forms)
-      try {
-        await page.click(selector, { force: true, timeout: 5000 });
-      } catch (clickErr2) {
-        if (clickErr2.message.includes('intercepts pointer events')) {
-          await page.keyboard.press('Escape');
-          await page.waitForTimeout(500);
-          await page.click(selector, { timeout: 5000 });
-        } else {
-          throw clickErr2;
+  // Tabs without ID — use coordinate click to avoid global [data-content] ambiguity
+  if (target.kind === 'tab' && !target.id && target.x && target.y) {
+    await page.mouse.click(target.x, target.y);
+  } else {
+    const selector = `[id="${target.id}"]`;
+    // Use Playwright click for proper mousedown/mouseup events
+    try {
+      await page.click(selector, { timeout: 5000 });
+    } catch (clickErr) {
+      if (clickErr.message.includes('intercepts pointer events')) {
+        // Surface overlay intercepts — try force click first (no side effects),
+        // then Escape + retry as fallback (Escape can trigger save dialogs on forms)
+        try {
+          await page.click(selector, { force: true, timeout: 5000 });
+        } catch (clickErr2) {
+          if (clickErr2.message.includes('intercepts pointer events')) {
+            await page.keyboard.press('Escape');
+            await page.waitForTimeout(500);
+            await page.click(selector, { timeout: 5000 });
+          } else {
+            throw clickErr2;
+          }
         }
+      } else {
+        throw clickErr;
       }
-    } else {
-      throw clickErr;
     }
   }
 
@@ -2526,10 +2527,29 @@ export async function fillTableRow(fields, { tab, add, row, table } = {}) {
       if (!f) return { tag: 'none' };
       if (f.tagName === 'INPUT' || f.tagName === 'TEXTAREA') {
         const inGrid = (() => { let n = f; while (n) { if (n.classList?.contains('grid') || n.classList?.contains('gridContent')) return true; n = n.parentElement; } return false; })();
-        if (inGrid) return {
-          tag: 'INPUT', id: f.id,
-          fullName: f.id.replace(/^form\\d+_/, '').replace(/_i\\d+$/, '')
-        };
+        if (inGrid) {
+          let headerText = '';
+          let grid = f; while (grid && !grid.classList?.contains('grid')) grid = grid.parentElement;
+          if (grid) {
+            const fr = f.getBoundingClientRect();
+            const head = grid.querySelector('.gridHead');
+            const hl = head?.querySelector('.gridLine') || head;
+            if (hl) for (const h of hl.children) {
+              if (h.offsetWidth === 0) continue;
+              const hr = h.getBoundingClientRect();
+              if (fr.x >= hr.x && fr.x < hr.x + hr.width) {
+                const t = h.querySelector('.gridBoxText');
+                headerText = (t || h).innerText?.trim() || '';
+                break;
+              }
+            }
+          }
+          return {
+            tag: 'INPUT', id: f.id,
+            fullName: f.id.replace(/^form\\d+_/, '').replace(/_i\\d+$/, ''),
+            headerText
+          };
+        }
       }
       return { tag: f.tagName || 'none' };
     })()`);
@@ -2575,6 +2595,19 @@ export async function fillTableRow(fields, { tab, add, row, table } = {}) {
       if (klNoSpace && (cellLower.endsWith(klNoSpace) || cellLower.includes(klNoSpace))) {
         matchedKey = key;
         break;
+      }
+    }
+
+    // Fallback: match by column header text (handles metadata typos in cell id)
+    if (!matchedKey && cell.headerText) {
+      const htLower = cell.headerText.toLowerCase();
+      for (const [key, info] of pending) {
+        if (info.filled) continue;
+        const kl = key.toLowerCase();
+        if (htLower === kl || htLower.endsWith(kl) || htLower.includes(kl)) {
+          matchedKey = key;
+          break;
+        }
       }
     }
 
@@ -2739,7 +2772,9 @@ export async function fillTableRow(fields, { tab, add, row, table } = {}) {
 
     if (eddItems && eddItems.length > 0) {
       // Reference field with autocomplete — click best match
-      const realItems = eddItems.filter(i => !i.startsWith('Создать'));
+      // Filter out reference field "create" actions (Создать элемент, Создать группу, Создать: ...)
+      // but keep standalone enum values like "Создать" (no space/colon after)
+      const realItems = eddItems.filter(i => !/^Создать[\s:]/.test(i));
 
       if (realItems.length > 0) {
         const tgt = normYo(text.toLowerCase());
