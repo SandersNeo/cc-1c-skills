@@ -3939,7 +3939,7 @@ export async function showCaption(text, opts = {}) {
     // Use video timeline position (accounts for frame duplication) instead of wall-clock
     recorder.captions.push({ text, speech, time: Math.round(recorder.videoTimeMs) });
     // Estimate TTS duration and wait so the video has enough screen time for voiceover
-    smartWaitMs = Math.max(2000, speech.length * 100);
+    smartWaitMs = Math.max(2000, speech.length * 70);
   }
   const position = opts.position || 'bottom';
   const fontSize = opts.fontSize || 24;
@@ -4207,7 +4207,7 @@ export async function showTitleSlide(text, opts = {}) {
     const captionText = typeof speech === 'string' ? speech : text.replace(/\n/g, ' ');
     if (captionText) {
       recorder.captions.push({ text: captionText, speech: captionText, time: Math.round(recorder.videoTimeMs) });
-      smartWaitMs = Math.max(2000, captionText.length * 100);
+      smartWaitMs = Math.max(2000, captionText.length * 70);
     }
   }
 
@@ -4315,7 +4315,7 @@ export async function showImage(imagePath, opts = {}) {
     const captionText = typeof speech === 'string' ? speech : '';
     if (captionText) {
       recorder.captions.push({ text: captionText, speech: captionText, time: Math.round(recorder.videoTimeMs) });
-      smartWaitMs = Math.max(2000, captionText.length * 100);
+      smartWaitMs = Math.max(2000, captionText.length * 70);
     }
   }
 

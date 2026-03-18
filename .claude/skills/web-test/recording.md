@@ -92,7 +92,7 @@ Display a text overlay on the page (visible in recording). Calling again updates
 
 The overlay uses `pointer-events: none` — does not interfere with clicking.
 
-**Smart TTS wait** (during recording): `showCaption` automatically pauses for the estimated TTS speech duration (~100ms per character, min 2s). The next `wait()` call accounts for this — if the explicit pause is shorter than the TTS wait already done, no extra delay is added. If longer, only the remaining difference is waited. This means script authors don't need to calculate TTS timing manually.
+**Smart TTS wait** (during recording): `showCaption` automatically pauses for the estimated TTS speech duration (~70ms per character, min 2s). The next `wait()` call accounts for this — if the explicit pause is shorter than the TTS wait already done, no extra delay is added. If longer, only the remaining difference is waited. This means script authors don't need to calculate TTS timing manually.
 
 ### `hideCaption()`
 
