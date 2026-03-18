@@ -4213,7 +4213,8 @@ export async function showTitleSlide(text, opts = {}) {
 
   await page.evaluate(({ text, subtitle, background, color, fontSize }) => {
     let div = document.getElementById('__web_test_title');
-    if (!div) {
+    const isNew = !div;
+    if (isNew) {
       div = document.createElement('div');
       div.id = '__web_test_title';
       document.body.appendChild(div);
@@ -4222,7 +4223,8 @@ export async function showTitleSlide(text, opts = {}) {
       'position:fixed', 'top:0', 'left:0', 'width:100%', 'height:100%',
       `background:${background}`,
       'display:flex', 'align-items:center', 'justify-content:center',
-      'z-index:999999', 'pointer-events:none'
+      'z-index:999999', 'pointer-events:none',
+      'transition:opacity 0.3s ease', isNew ? 'opacity:0' : ''
     ].join(';');
     const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/\n/g, '<br>');
     let html = `<div style="font-size:${fontSize}px;font-weight:600;line-height:1.4;">${esc(text)}</div>`;
@@ -4230,6 +4232,7 @@ export async function showTitleSlide(text, opts = {}) {
       html += `<div style="font-size:${Math.round(fontSize * 0.5)}px;margin-top:16px;opacity:0.7;">${esc(subtitle)}</div>`;
     }
     div.innerHTML = `<div style="text-align:center;max-width:70%;color:${color};font-family:'Segoe UI',Arial,sans-serif;">${html}</div>`;
+    if (isNew) requestAnimationFrame(() => { div.style.opacity = '1'; });
   }, { text, subtitle, background, color, fontSize });
 
   // Smart TTS wait (same pattern as showCaption/showImage)
@@ -4245,13 +4248,22 @@ export async function showTitleSlide(text, opts = {}) {
   }
 }
 
-/** Remove the title slide overlay. */
+/** Remove the title slide overlay (with fade-out). */
 export async function hideTitleSlide() {
   ensureConnected();
-  await page.evaluate(() => {
+  const exists = await page.evaluate(() => {
     const el = document.getElementById('__web_test_title');
-    if (el) el.remove();
+    if (!el) return false;
+    el.style.opacity = '0';
+    return true;
   });
+  if (exists) {
+    await page.waitForTimeout(350);
+    await page.evaluate(() => {
+      const el = document.getElementById('__web_test_title');
+      if (el) el.remove();
+    });
+  }
 }
 
 /**
@@ -4325,7 +4337,8 @@ export async function showImage(imagePath, opts = {}) {
 
   await page.evaluate(({ dataUrl, fit, bg, useBlur, shadow, maxSize, isFull }) => {
     let div = document.getElementById('__web_test_image');
-    if (!div) {
+    const isNew = !div;
+    if (isNew) {
       div = document.createElement('div');
       div.id = '__web_test_image';
       document.body.appendChild(div);
@@ -4334,7 +4347,8 @@ export async function showImage(imagePath, opts = {}) {
       'position:fixed', 'top:0', 'left:0', 'width:100%', 'height:100%',
       `background:${bg}`,
       'display:flex', 'align-items:center', 'justify-content:center',
-      'z-index:999999', 'pointer-events:none', 'overflow:hidden'
+      'z-index:999999', 'pointer-events:none', 'overflow:hidden',
+      'transition:opacity 0.3s ease', isNew ? 'opacity:0' : ''
     ].join(';');
 
     let html = '';
@@ -4352,6 +4366,7 @@ export async function showImage(imagePath, opts = {}) {
     html += `<img src="${dataUrl}" style="position:relative;${sizeCss}${shadowCss}" />`;
 
     div.innerHTML = html;
+    if (isNew) requestAnimationFrame(() => { div.style.opacity = '1'; });
   }, { dataUrl, fit, bg, useBlur, shadow, maxSize, isFull });
 
   // Smart TTS wait (same pattern as showCaption)
@@ -4367,13 +4382,22 @@ export async function showImage(imagePath, opts = {}) {
   }
 }
 
-/** Remove the image overlay from the page. */
+/** Remove the image overlay (with fade-out). */
 export async function hideImage() {
   ensureConnected();
-  await page.evaluate(() => {
+  const exists = await page.evaluate(() => {
     const el = document.getElementById('__web_test_image');
-    if (el) el.remove();
+    if (!el) return false;
+    el.style.opacity = '0';
+    return true;
   });
+  if (exists) {
+    await page.waitForTimeout(350);
+    await page.evaluate(() => {
+      const el = document.getElementById('__web_test_image');
+      if (el) el.remove();
+    });
+  }
 }
 
 /**
