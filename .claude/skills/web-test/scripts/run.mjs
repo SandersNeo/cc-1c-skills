@@ -230,7 +230,7 @@ async function cmdExec(fileOrDash, flags = {}) {
   const result = await new Promise((resolve, reject) => {
     const req = http.request({
       hostname: '127.0.0.1', port: sess.port, path: '/exec',
-      method: 'POST', timeout: 10 * 60 * 1000, headers,
+      method: 'POST', timeout: 30 * 60 * 1000, headers,
     }, res => {
       let data = '';
       res.on('data', chunk => data += chunk);

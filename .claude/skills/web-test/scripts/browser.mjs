@@ -3916,7 +3916,8 @@ export async function startRecording(outputPath, opts = {}) {
     if (dupes > 0) lastFrameTime = now;
   };
 
-  recorder = { cdp, ffmpeg, startTime: Date.now(), outputPath: resolvedPath, ffmpegError: '', captions: [], videoTimeMs: 0, _flushFrames };
+  const speechRate = opts.speechRate || 70; // ms per character for smart TTS wait
+  recorder = { cdp, ffmpeg, startTime: Date.now(), outputPath: resolvedPath, ffmpegError: '', captions: [], videoTimeMs: 0, _flushFrames, speechRate };
   // Redirect stderr accumulation to the recorder object
   ffmpeg.stderr.removeAllListeners('data');
   ffmpeg.stderr.on('data', d => { recorder.ffmpegError += d.toString(); });
@@ -3997,12 +3998,12 @@ export async function showCaption(text, opts = {}) {
 
   // Collect caption for TTS narration if recording
   let smartWaitMs = 0;
-  if (recorder && text.trim() && opts.speech !== false) {
+  if (recorder && (text.trim() || typeof opts.speech === 'string') && opts.speech !== false) {
     const speech = typeof opts.speech === 'string' ? opts.speech : text;
     // Use video timeline position (accounts for frame duplication) instead of wall-clock
-    recorder.captions.push({ text, speech, time: Math.round(recorder.videoTimeMs) });
+    recorder.captions.push({ text: text || speech, speech, time: Math.round(recorder.videoTimeMs), ...(opts.voice ? { voice: opts.voice } : {}) });
     // Estimate TTS duration and wait so the video has enough screen time for voiceover
-    smartWaitMs = Math.max(2000, speech.length * 70);
+    smartWaitMs = Math.max(2000, speech.length * (recorder.speechRate || 70));
   }
   const position = opts.position || 'bottom';
   const fontSize = opts.fontSize || 24;
@@ -4067,7 +4068,7 @@ export function getCaptions() {
  * Generates speech from captions and merges audio with the video.
  * @param {string} videoPath — path to the recorded MP4 file
  * @param {object} [opts]
- * @param {Array<{text: string, speech: string, time: number}>} [opts.captions] — explicit captions (default: from last recording or .captions.json)
+ * @param {Array<{text: string, speech: string, time: number, voice?: string}>} [opts.captions] — explicit captions (default: from last recording or .captions.json). Each caption may include a `voice` field to override the global voice for that segment
  * @param {string} [opts.provider='edge'] — TTS provider: 'edge' or 'openai'
  * @param {string} [opts.voice] — voice name (provider-specific)
  * @param {string} [opts.apiKey] — API key (for openai provider)
@@ -4145,12 +4146,13 @@ export async function addNarration(videoPath, opts = {}) {
       const promises = batch.map(async (cap, batchIdx) => {
         const idx = batchStart + batchIdx;
         const ttsFile = pathJoin(tempDir, `tts_${idx}.mp3`);
+        const capTtsOpts = cap.voice ? { ...ttsOpts, voice: cap.voice } : ttsOpts;
         try {
-          await ttsProvider(cap.speech, ttsFile, ttsOpts);
+          await ttsProvider(cap.speech, ttsFile, capTtsOpts);
         } catch (err) {
           // Retry once
           try {
-            await ttsProvider(cap.speech, ttsFile, ttsOpts);
+            await ttsProvider(cap.speech, ttsFile, capTtsOpts);
           } catch (retryErr) {
             warnings.push(`TTS failed for caption ${idx}: ${retryErr.message || retryErr.cause?.message || String(retryErr)}`);
             // Generate 1s silence as placeholder
@@ -4269,8 +4271,8 @@ export async function showTitleSlide(text, opts = {}) {
   if (recorder && speech && speech !== false) {
     const captionText = typeof speech === 'string' ? speech : text.replace(/\n/g, ' ');
     if (captionText) {
-      recorder.captions.push({ text: captionText, speech: captionText, time: Math.round(recorder.videoTimeMs) });
-      smartWaitMs = Math.max(2000, captionText.length * 70);
+      recorder.captions.push({ text: captionText, speech: captionText, time: Math.round(recorder.videoTimeMs), ...(opts.voice ? { voice: opts.voice } : {}) });
+      smartWaitMs = Math.max(2000, captionText.length * (recorder.speechRate || 70));
     }
   }
 
@@ -4380,8 +4382,8 @@ export async function showImage(imagePath, opts = {}) {
   if (recorder && speech && speech !== false) {
     const captionText = typeof speech === 'string' ? speech : '';
     if (captionText) {
-      recorder.captions.push({ text: captionText, speech: captionText, time: Math.round(recorder.videoTimeMs) });
-      smartWaitMs = Math.max(2000, captionText.length * 70);
+      recorder.captions.push({ text: captionText, speech: captionText, time: Math.round(recorder.videoTimeMs), ...(opts.voice ? { voice: opts.voice } : {}) });
+      smartWaitMs = Math.max(2000, captionText.length * (recorder.speechRate || 70));
     }
   }
 
