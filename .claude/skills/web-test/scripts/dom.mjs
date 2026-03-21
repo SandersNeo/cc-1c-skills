@@ -1147,6 +1147,16 @@ export function checkErrorsScript() {
           .filter(Boolean);
         if (texts.length > 0) {
           result.modal = { message: texts.join(' '), formNum: parseInt(fn), button: buttons[0].innerText?.trim() || '' };
+          // Check if OpenReport link is available (platform exceptions have visible link text)
+          const reportLink = document.getElementById(p + 'OpenReport#text');
+          if (reportLink && reportLink.offsetWidth > 2 && reportLink.textContent.trim()) {
+            result.modal.hasReport = true;
+          }
+          // Grab AdditionalInfo/ServerText if filled (may contain extra error details)
+          const addInfo = document.getElementById(p + 'AdditionalInfo');
+          if (addInfo && addInfo.textContent && addInfo.textContent.trim()) result.modal.additionalInfo = addInfo.textContent.trim();
+          const srvText = document.getElementById(p + 'ServerText');
+          if (srvText && srvText.textContent && srvText.textContent.trim()) result.modal.serverText = srvText.textContent.trim();
           break;
         }
       }

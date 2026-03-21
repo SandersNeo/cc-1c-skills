@@ -359,6 +359,237 @@ async function dismissPendingErrors() {
   return err;
 }
 
+/**
+ * Close any platform-level dialogs that may be left open (about, support info, error report).
+ * These are NOT 1C forms — they are platform UI overlays invisible to getFormState().
+ * Each close is wrapped in try/catch to avoid cascading failures.
+ */
+async function _closePlatformDialogs() {
+  await page.evaluate(() => {
+    // "Подробный текст ошибки" OK button (inside error report detail view)
+    // It's a cloud window with its own OK button — look for visible pressDefault in small ps*win
+    const psWins = document.querySelectorAll('[id^="ps"][id$="win"]');
+    for (const w of psWins) {
+      if (w.offsetWidth === 0) continue;
+      // Check if this is a small dialog (error detail, about, support info)
+      const closeBtn = w.querySelector('[id$="_cmd_CloseButton"]');
+      if (closeBtn && closeBtn.offsetWidth > 0) {
+        try { closeBtn.click(); } catch {}
+      }
+    }
+    // "Информация для технической поддержки" — extOkBtn
+    const extOk = document.getElementById('extOkBtn');
+    if (extOk && extOk.offsetWidth > 0) try { extOk.click(); } catch {}
+    // "О программе" — aboutOkButton
+    const aboutOk = document.getElementById('aboutOkButton');
+    if (aboutOk && aboutOk.offsetWidth > 0) try { aboutOk.click(); } catch {}
+  });
+  await page.waitForTimeout(300);
+}
+
+/**
+ * Parse raw error stack text into structured entries.
+ * Input: raw text from errJournalInput (first block) or "Подробный текст ошибки" textarea.
+ * Returns { raw, timestamp?, entries: [{location, code}] }
+ */
+function _parseErrorStack(raw) {
+  if (!raw) return null;
+  const result = { raw, entries: [] };
+  // Extract timestamp if present (format: DD.MM.YYYY HH:MM:SS)
+  const tsMatch = raw.match(/^(\d{2}\.\d{2}\.\d{4}\s+\d{1,2}:\d{2}:\d{2})/m);
+  if (tsMatch) result.timestamp = tsMatch[1];
+  // Extract {Module.Path(lineNum)}: code entries
+  const entryRe = /\{([^}]+)\}:\s*(.+)/g;
+  let m;
+  while ((m = entryRe.exec(raw)) !== null) {
+    result.entries.push({ location: m[1].trim(), code: m[2].trim() });
+  }
+  return result.entries.length > 0 ? result : null;
+}
+
+/**
+ * Fetch error call stack from the 1C platform UI.
+ * Uses two strategies:
+ *   Path 1 (hasReport=true): Click OpenReport link → "подробный текст ошибки" → read textarea
+ *   Path 2 (fallback): Hamburger → "О программе" → "Информация для техподдержки" → errJournalInput
+ *
+ * Always closes the error modal and any platform dialogs it opened.
+ * Returns parsed stack object or null on failure.
+ *
+ * @param {number} formNum - form number of the error modal (e.g. 6 for form6_)
+ * @param {boolean} hasReport - true if OpenReport link is available
+ */
+export async function fetchErrorStack(formNum, hasReport) {
+  try {
+    // Platform exception modals are initially unstable — they redraw within ~1s.
+    // The initial state may lack the OpenReport link. Re-check after a short delay.
+    if (!hasReport) {
+      await page.waitForTimeout(1500);
+      hasReport = await page.evaluate((fn) => {
+        const el = document.getElementById('form' + fn + '_OpenReport#text');
+        return !!(el && el.offsetWidth > 2 && el.textContent.trim());
+      }, formNum);
+    }
+    if (hasReport) return await _fetchStackViaReport(formNum);
+    return await _fetchStackViaHamburger(formNum);
+  } catch {
+    return null;
+  } finally {
+    // Ensure all platform dialogs are closed
+    try { await _closePlatformDialogs(); } catch {}
+    // Ensure the error modal itself is closed
+    try {
+      const sel = formNum != null
+        ? `#form${formNum}_container a.press.pressDefault`
+        : 'a.press.pressDefault';
+      const btn = await page.$(sel);
+      if (btn) await btn.click({ force: true });
+      await page.waitForTimeout(300);
+    } catch {}
+  }
+}
+
+/**
+ * Path 1: Fetch stack via OpenReport link (for platform exceptions).
+ * The error modal must still be open with a visible "Сформировать отчет об ошибке" link.
+ */
+async function _fetchStackViaReport(formNum) {
+  // 1. Get coordinates of the OpenReport link and click via mouse (modalSurface blocks JS clicks)
+  const coords = await page.evaluate((fn) => {
+    const el = document.getElementById('form' + fn + '_OpenReport#text');
+    if (!el || el.offsetWidth <= 2) return null;
+    const rect = el.getBoundingClientRect();
+    return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+  }, formNum);
+  if (!coords) return null;
+
+  await page.mouse.click(coords.x, coords.y);
+
+  // 2. Wait for "Отчет об ошибке" dialog — look for "подробный текст ошибки" link
+  let found = false;
+  for (let i = 0; i < 20; i++) {
+    await page.waitForTimeout(500);
+    found = await page.evaluate(() => {
+      const links = document.querySelectorAll('a, [class*="hyper"], span');
+      for (const el of links) {
+        if (el.offsetWidth > 0 && el.textContent.includes('подробный текст ошибки')) return true;
+      }
+      return false;
+    });
+    if (found) break;
+  }
+  if (!found) return null;
+
+  // 3. Click "подробный текст ошибки"
+  await page.getByText('подробный текст ошибки').click();
+  await page.waitForTimeout(2000);
+
+  // 4. Read the textarea with detailed error text (find the largest visible textarea)
+  const raw = await page.evaluate(() => {
+    let best = null;
+    document.querySelectorAll('textarea').forEach(ta => {
+      if (ta.offsetWidth > 0 && ta.value.length > 0) {
+        if (!best || ta.value.length > best.value.length) best = ta;
+      }
+    });
+    return best?.value || null;
+  });
+
+  // 5. Close "Подробный текст ошибки" dialog (click its OK button)
+  try {
+    const okBtn = await page.evaluate(() => {
+      // Find the OK button in the topmost small cloud window
+      const psWins = [...document.querySelectorAll('[id^="ps"][id$="win"]')]
+        .filter(w => w.offsetWidth > 0)
+        .sort((a, b) => parseInt(b.style?.zIndex || '0') - parseInt(a.style?.zIndex || '0'));
+      for (const w of psWins) {
+        const ok = w.querySelector('button.webBtn, .pressDefault');
+        if (ok && ok.textContent.trim() === 'OK') { ok.click(); return true; }
+      }
+      return false;
+    });
+    await page.waitForTimeout(300);
+  } catch {}
+
+  // 6. Close "Отчет об ошибке" dialog (click its × close button)
+  try {
+    await page.evaluate(() => {
+      const psWins = [...document.querySelectorAll('[id^="ps"][id$="win"]')]
+        .filter(w => w.offsetWidth > 0);
+      for (const w of psWins) {
+        const closeBtn = w.querySelector('[id$="_cmd_CloseButton"]');
+        if (closeBtn && closeBtn.offsetWidth > 0) { closeBtn.click(); break; }
+      }
+    });
+    await page.waitForTimeout(300);
+  } catch {}
+
+  return _parseErrorStack(raw);
+}
+
+/**
+ * Path 2: Fetch stack via hamburger menu → "О программе" → "Информация для техподдержки".
+ * Works for all error types including simple ВызватьИсключение.
+ * The error modal is closed first to allow access to the hamburger menu.
+ */
+async function _fetchStackViaHamburger(formNum) {
+  // 1. Close the error modal first
+  try {
+    const sel = formNum != null
+      ? `#form${formNum}_container a.press.pressDefault`
+      : 'a.press.pressDefault';
+    const btn = await page.$(sel);
+    if (btn) await btn.click({ force: true });
+    await page.waitForTimeout(500);
+  } catch {}
+
+  // 2. Click hamburger menu
+  await page.click('#captionbarMore', { timeout: 5000 });
+  await page.waitForTimeout(1000);
+
+  // 3. Click "О программе..."
+  await page.getByText('О программе...', { exact: true }).click({ timeout: 5000 });
+  await page.waitForTimeout(2000);
+
+  // 4. Click "Информация для технической поддержки"
+  await page.click('#aboutHyperLink', { timeout: 5000 });
+
+  // 5. Wait for errJournalInput to appear and be filled
+  let raw = null;
+  for (let i = 0; i < 20; i++) {
+    await page.waitForTimeout(500);
+    raw = await page.evaluate(() => {
+      const el = document.getElementById('errJournalInput');
+      return (el && el.offsetWidth > 0 && el.value.length > 50) ? el.value : null;
+    });
+    if (raw) break;
+  }
+  if (!raw) return null;
+
+  // 6. Parse first error block (most recent — before first separator)
+  const separator = / - - - - /;
+  const errSection = raw.indexOf('\n\n') !== -1 ? raw.substring(raw.indexOf('\n\n')) : raw;
+  // Find the "Ошибки:" section
+  const errIdx = raw.indexOf('Ошибки:');
+  let errorText = errIdx !== -1 ? raw.substring(errIdx + 'Ошибки:'.length).trim() : raw;
+  // Take first block (before first separator line)
+  const lines = errorText.split('\n');
+  const firstBlockLines = [];
+  let inBlock = false;
+  for (const line of lines) {
+    if (separator.test(line)) {
+      if (inBlock) break; // end of first block
+      inBlock = true;
+      continue;
+    }
+    if (inBlock) firstBlockLines.push(line);
+  }
+  const firstBlock = firstBlockLines.join('\n').trim();
+
+  // 7. Close support info and about dialogs (done in finally via _closePlatformDialogs)
+  return _parseErrorStack(firstBlock || errorText);
+}
+
 /** Get the raw Playwright page object (for advanced scripting in skill mode). */
 export function getPage() {
   ensureConnected();

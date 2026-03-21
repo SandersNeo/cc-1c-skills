@@ -145,9 +145,16 @@ async function executeScript(code, { noRecord } = {}) {
         const result = await orig(...args);
         const errors = result?.errors;
         if (errors?.modal || errors?.balloon) {
+          // Try to fetch call stack for modal errors before throwing
+          let stack = null;
+          if (errors?.modal && typeof exports.fetchErrorStack === 'function') {
+            try {
+              stack = await exports.fetchErrorStack(errors.modal.formNum, errors.modal.hasReport);
+            } catch { /* don't fail if stack fetch fails */ }
+          }
           const msg = errors.modal?.message || errors.balloon?.message || 'Unknown 1C error';
           const err = new Error(msg);
-          err.onecError = { step: name, args, errors, formState: result };
+          err.onecError = { step: name, args, errors, formState: result, stack };
           throw err;
         }
         return result;
@@ -186,6 +193,7 @@ async function executeScript(code, { noRecord } = {}) {
       result.stepArgs = e.onecError.args;
       result.onecErrors = e.onecError.errors;
       result.formState = e.onecError.formState;
+      if (e.onecError.stack) result.stack = e.onecError.stack;
     }
 
     return result;
