@@ -344,6 +344,12 @@ async function checkForErrors() {
  * Returns the dismissed error object or null.
  */
 async function dismissPendingErrors() {
+  // Close leftover platform dialogs first (About, Support Info, Error Report)
+  // These block all interaction via modalSurface and are invisible to 1C form detection
+  try {
+    const pd = await _detectPlatformDialogs();
+    if (pd.length) await _closePlatformDialogs();
+  } catch { /* OK */ }
   const err = await checkForErrors();
   if (!err?.modal) return null;
   try {
