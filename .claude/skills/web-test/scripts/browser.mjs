@@ -1939,7 +1939,6 @@ export async function clickElement(text, { dblclick, table, toggle, expand, time
       return { error: 'not_found', available: btns.map(el => norm(el.innerText)).filter(Boolean) };
     })()`);
     if (btnResult?.error) throw new Error(`clickElement: "${text}" not found among confirmation buttons. Available: ${btnResult.available?.join(', ') || 'none'}`);
-    if (recorder) await page.waitForTimeout(1500); // show confirmation dialog to viewer during recording
     await page.mouse.click(btnResult.x, btnResult.y);
     await waitForStable();
     const state = await getFormState();
@@ -2275,7 +2274,7 @@ export async function closeForm({ save } = {}) {
       for (const b of btns) {
         const txt = (await b.textContent()).trim();
         if (txt === label) {
-          if (recorder) await page.waitForTimeout(1500); // show confirmation to viewer during recording
+          if (recorder) await page.waitForTimeout(500); // show confirmation to viewer during recording
           await b.click({ force: true });
           await waitForStable(beforeForm);
           break;
