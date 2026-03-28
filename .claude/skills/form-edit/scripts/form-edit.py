@@ -1242,8 +1242,10 @@ if elem_events_list:
 # ── 13. Save ────────────────────────────────────────────────
 
 xml_bytes = etree.tostring(tree, xml_declaration=True, encoding="UTF-8")
-# Fix encoding declaration case
-xml_bytes = xml_bytes.replace(b"encoding='UTF-8'", b'encoding="UTF-8"')
+# Fix XML declaration quotes
+xml_bytes = xml_bytes.replace(b"<?xml version='1.0' encoding='UTF-8'?>", b'<?xml version="1.0" encoding="utf-8"?>')
+if not xml_bytes.endswith(b"\n"):
+    xml_bytes += b"\n"
 # Write with BOM
 with open(resolved_form_path, "wb") as f:
     f.write(b'\xef\xbb\xbf')

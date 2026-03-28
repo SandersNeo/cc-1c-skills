@@ -255,11 +255,37 @@ function buildArgs(skillConfig, caseData, workDir, inputFilePath, runtime) {
 
 const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
 
+function normalizeXmlContent(text) {
+  let s = text;
+  // 1. XML declaration: normalize quotes and encoding case
+  s = s.replace(
+    /<\?xml\s+version=['"]1\.0['"]\s+encoding=['"]([^'"]+)['"]\s*\?>/gi,
+    (_, enc) => `<?xml version="1.0" encoding="${enc.toLowerCase()}"?>`
+  );
+  // 2. Remove &#13; (CR encoded as XML entity by Python etree)
+  s = s.replace(/&#13;/g, '');
+  // 3. Strip xmlns declarations (Python etree strips unused ones)
+  s = s.replace(/\s+xmlns(?::[\w]+)?="[^"]*"/g, '');
+  // 4. Normalize self-closing tags: remove space before />
+  s = s.replace(/\s*\/>/g, '/>');
+  // 5. Collapse whitespace between tags: ">  \n\t  <" → "><"
+  s = s.replace(/>\s+</g, '><');
+  // 6. Normalize empty elements: <Tag></Tag> → <Tag/>
+  s = s.replace(/<([\w:.]+)([^>]*)><\/\1>/g, '<$1$2/>');
+  // 7. Strip trailing whitespace
+  s = s.trimEnd();
+  return s;
+}
+
 function normalizeContent(text, config) {
   // Strip BOM
   let s = text.replace(/^\uFEFF/, '');
   // Normalize line endings
   s = s.replace(/\r\n/g, '\n');
+  // Normalize XML differences (Python etree serialization quirks)
+  if (config?.runtime === 'python') {
+    s = normalizeXmlContent(s);
+  }
 
   // Normalize UUIDs
   if (config?.normalizeUuids) {
@@ -453,7 +479,7 @@ async function runCaseAsync(testCase, opts) {
         }
       }
       if (errors.length === 0 && !caseData.expectError && !workspace.readOnly) {
-        const snapshotConfig = skillConfig.snapshot || {};
+        const snapshotConfig = { ...skillConfig.snapshot, runtime: opts.runtime };
         if (opts.updateSnapshots) {
           updateSnapshot(workDir, snapshotDir, snapshotConfig);
         } else {
@@ -599,7 +625,7 @@ function runCase(testCase, opts) {
 
       // Snapshot comparison (skip for external/read-only workspaces)
       if (errors.length === 0 && !caseData.expectError && !workspace.readOnly) {
-        const snapshotConfig = skillConfig.snapshot || {};
+        const snapshotConfig = { ...skillConfig.snapshot, runtime: opts.runtime };
         if (opts.updateSnapshots) {
           updateSnapshot(workDir, snapshotDir, snapshotConfig);
         } else {

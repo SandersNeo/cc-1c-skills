@@ -2340,7 +2340,7 @@ if obj_type == 'WebService':
 X(f'\t</{obj_type}>')
 X('</MetaDataObject>')
 
-metadata_xml = '\n'.join(lines)
+metadata_xml = '\n'.join(lines) + '\n'
 
 # ---------------------------------------------------------------------------
 # 16. Write files
@@ -2502,9 +2502,13 @@ if os.path.isfile(config_xml_path):
 
             # Write back preserving BOM
             tree.write(config_xml_path, encoding='utf-8', xml_declaration=True)
-            # Re-read to add BOM
+            # Re-read to add BOM, fix declaration quotes, ensure trailing newline
             with open(config_xml_path, 'r', encoding='utf-8') as f:
                 raw = f.read()
+            if raw.startswith("<?xml version='1.0' encoding='utf-8'?>"):
+                raw = raw.replace("<?xml version='1.0' encoding='utf-8'?>", '<?xml version="1.0" encoding="UTF-8"?>', 1)
+            if not raw.endswith('\n'):
+                raw += '\n'
             write_utf8_bom(config_xml_path, raw)
             reg_result = 'added'
     else:

@@ -1997,8 +1997,8 @@ def set_complex_property(property_name, values):
 def save_xml(tree, path):
     """Save XML tree with BOM and proper encoding declaration."""
     xml_bytes = etree.tostring(tree, xml_declaration=True, encoding="UTF-8")
-    # Fix encoding quotes: encoding='UTF-8' -> encoding="UTF-8"
-    xml_bytes = xml_bytes.replace(b"encoding='UTF-8'", b'encoding="UTF-8"')
+    # Fix XML declaration quotes
+    xml_bytes = xml_bytes.replace(b"<?xml version='1.0' encoding='UTF-8'?>", b'<?xml version="1.0" encoding="utf-8"?>')
     # Fix d5p1 namespace declarations stripped by lxml (it treats them as unused
     # because d5p1: appears only in text content, not in element/attribute names)
     xml_bytes = re.sub(
@@ -2006,6 +2006,8 @@ def save_xml(tree, path):
         b'\\1 xmlns:d5p1="http://v8.1c.ru/8.1/data/enterprise/current-config"\\2',
         xml_bytes
     )
+    if not xml_bytes.endswith(b"\n"):
+        xml_bytes += b"\n"
     with open(path, "wb") as f:
         f.write(b"\xef\xbb\xbf")
         f.write(xml_bytes)
