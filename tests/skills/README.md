@@ -52,7 +52,7 @@ Exit code: 0 = все прошли, 1 = есть падения.
 | Поле | Описание |
 |---|---|
 | `script` | Путь от `.claude/skills/`, без расширения. Раннер добавит `.ps1` (по умолчанию) или `.py` |
-| `setup` | Фикстура: `"empty-config"`, `"base-config"`, `"none"`, `"fixture:<name>"` |
+| `setup` | Фикстура: `"empty-config"`, `"base-config"`, `"none"`, `"fixture:<name>"` (из `fixtures/` папки навыка) |
 | `args` | Маппинг параметров навыка (см. ниже) |
 | `snapshot` | Настройки сравнения: `root` (`"workDir"` или `"outputPath"`) и `normalizeUuids` |
 
@@ -184,13 +184,12 @@ tests/skills/
   runner.mjs              # тест-раннер
   README.md               # этот файл
   .cache/                 # кэш фикстур (в .gitignore)
-  fixtures/               # broken-фикстуры для тестов валидаторов
-    broken/
-      <имя>/              # сломанный XML для негативных тестов validate-навыков
   cases/
     <навык>/
       _skill.json         # конфиг навыка
       <кейс>.json         # тестовый случай
       snapshots/
         <кейс>/           # эталон
+      fixtures/            # broken-фикстуры (для validate-навыков)
+        <имя>/             # сломанный XML, ссылка: "setup": "fixture:<имя>"
 ```

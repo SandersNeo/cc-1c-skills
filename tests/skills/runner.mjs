@@ -15,7 +15,6 @@ const REPO_ROOT = resolve(ROOT, '../..');
 const SKILLS    = resolve(REPO_ROOT, '.claude/skills');
 const CASES     = resolve(ROOT, 'cases');
 const CACHE     = resolve(ROOT, '.cache');
-const FIXTURES  = resolve(ROOT, 'fixtures');
 
 // ─── CLI args ───────────────────────────────────────────────────────────────
 
@@ -80,11 +79,12 @@ function discoverCases(filter) {
 
 // ─── Setup / Fixtures ───────────────────────────────────────────────────────
 
-function ensureSetup(setupName, runtime) {
+function ensureSetup(setupName, runtime, skillCasesDir) {
   if (setupName === 'none' || !setupName) return null;
 
   if (setupName.startsWith('fixture:')) {
-    const fixturePath = join(FIXTURES, setupName.slice('fixture:'.length));
+    // Resolve relative to skill's cases directory (e.g. cases/meta-validate/fixtures/...)
+    const fixturePath = join(skillCasesDir, 'fixtures', setupName.slice('fixture:'.length));
     if (!existsSync(fixturePath)) throw new Error(`Fixture not found: ${fixturePath}`);
     return fixturePath;
   }
@@ -331,7 +331,8 @@ function runCase(testCase, opts) {
 
   try {
     // 1. Setup workspace
-    const fixturePath = ensureSetup(setupName, opts.runtime);
+    const skillCasesDir = join(CASES, testCase.skillDir);
+    const fixturePath = ensureSetup(setupName, opts.runtime, skillCasesDir);
     workDir = createWorkspace(fixturePath);
 
     // 2. Pre-run steps (setup prerequisites like creating objects)
