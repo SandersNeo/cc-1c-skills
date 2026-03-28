@@ -1,0 +1,21 @@
+{
+  "name": "Справочник с табличной частью",
+  "input": {
+    "type": "Catalog",
+    "name": "Товары",
+    "attributes": [
+      { "name": "Артикул", "type": "String", "length": 25 }
+    ],
+    "tabularSections": [
+      {
+        "name": "Штрихкоды",
+        "attributes": [
+          { "name": "Штрихкод", "type": "String", "length": 128 }
+        ]
+      }
+    ]
+  },
+  "expect": {
+    "files": ["Catalogs/Товары.xml", "Catalogs/Товары/Ext/ObjectModule.bsl"]
+  }
+}

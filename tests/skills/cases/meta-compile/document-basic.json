@@ -1,0 +1,23 @@
+{
+  "name": "Документ с табличной частью",
+  "input": {
+    "type": "Document",
+    "name": "ПриходнаяНакладная",
+    "attributes": [
+      { "name": "Склад", "type": "String", "length": 100 }
+    ],
+    "tabularSections": [
+      {
+        "name": "Товары",
+        "attributes": [
+          { "name": "Номенклатура", "type": "String", "length": 150 },
+          { "name": "Количество", "type": "Number", "length": 15, "precision": 3 },
+          { "name": "Цена", "type": "Number", "length": 15, "precision": 2 }
+        ]
+      }
+    ]
+  },
+  "expect": {
+    "files": ["Documents/ПриходнаяНакладная.xml"]
+  }
+}

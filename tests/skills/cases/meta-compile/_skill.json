@@ -1,0 +1,12 @@
+{
+  "script": "meta-compile/scripts/meta-compile",
+  "setup": "empty-config",
+  "args": [
+    { "flag": "-JsonPath", "from": "inputFile" },
+    { "flag": "-OutputDir", "from": "workDir" }
+  ],
+  "snapshot": {
+    "root": "workDir",
+    "normalizeUuids": true
+  }
+}

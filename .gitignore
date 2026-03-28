@@ -19,6 +19,9 @@ tools/
 # Отладка навыков (eval, trigger-test, run_loop результаты)
 debug/
 
+# Кэш тестов навыков
+tests/skills/.cache/
+
 # Python кэш
 __pycache__/
 
