@@ -60,7 +60,7 @@ function discoverCases(filter) {
 
       const casePath = join(skillPath, file);
       const caseData = JSON.parse(readFileSync(casePath, 'utf8'));
-      const snapshotDir = join(skillPath, `${caseName}.snapshot`);
+      const snapshotDir = join(skillPath, 'snapshots', caseName);
 
       results.push({
         id: caseId,
