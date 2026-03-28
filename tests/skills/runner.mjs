@@ -175,6 +175,12 @@ function buildArgs(skillConfig, caseData, workDir, inputFilePath, runtime) {
       case 'outputPath':
         args.push(join(workDir, caseData.outputPath || ''));
         break;
+      case 'workPath':
+        // workDir + value from case.params or case (specified in mapping.field)
+        const wpField = mapping.field || 'objectPath';
+        const wpVal = caseData.params?.[wpField] ?? caseData[wpField] ?? '';
+        args.push(join(workDir, wpVal));
+        break;
       case 'switch':
         // flag already pushed, no value needed — remove the flag and re-push conditionally
         args.pop(); // remove flag, will re-add if switch is active
@@ -327,13 +333,44 @@ function runCase(testCase, opts) {
     const fixturePath = ensureSetup(setupName, opts.runtime);
     workDir = createWorkspace(fixturePath);
 
-    // 2. Write input JSON if needed
+    // 2. Pre-run steps (setup prerequisites like creating objects)
+    if (caseData.preRun) {
+      for (const step of caseData.preRun) {
+        const preScript = resolveScript(step.script, opts.runtime);
+        const preArgs = [];
+        for (const [flag, value] of Object.entries(step.args || {})) {
+          preArgs.push(flag);
+          const resolved = String(value)
+            .replace('{workDir}', workDir)
+            .replace('{inputFile}', '');
+          preArgs.push(resolved);
+        }
+        // Write step input to temp file if needed
+        let preInputFile = null;
+        if (step.input) {
+          preInputFile = join(workDir, '__pre_input.json');
+          writeFileSync(preInputFile, JSON.stringify(step.input, null, 2), 'utf8');
+          // Replace {inputFile} references in args
+          for (let i = 0; i < preArgs.length; i++) {
+            if (preArgs[i] === '') preArgs[i] = preInputFile;
+          }
+        }
+        try {
+          execSkillRaw(opts.runtime, preScript, preArgs);
+        } catch (e) {
+          throw new Error(`preRun step "${step.script}" failed: ${e.stderr || e.message}`);
+        }
+        if (preInputFile && existsSync(preInputFile)) rmSync(preInputFile);
+      }
+    }
+
+    // 3. Write input JSON if needed
     if (caseData.input !== undefined) {
       inputFile = join(workDir, '__input.json');
       writeFileSync(inputFile, JSON.stringify(caseData.input, null, 2), 'utf8');
     }
 
-    // 3. Build CLI args and execute
+    // 4. Build CLI args and execute
     const { scriptPath, args } = buildArgs(skillConfig, caseData, workDir, inputFile, opts.runtime);
     let stdout = '', stderr = '', exitCode = 0;
 
