@@ -356,8 +356,8 @@ function compareSnapshot(workDir, snapshotDir, snapshotConfig) {
         file: relFile,
         type: 'content',
         line: diffLine,
-        expected: expectedLines[diffLine - 1]?.substring(0, 120),
-        actual: actualLines[diffLine - 1]?.substring(0, 120),
+        expected: expectedLines[diffLine - 1]?.substring(0, 600),
+        actual: actualLines[diffLine - 1]?.substring(0, 600),
       });
     }
   }

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# role-compile v1.1 — Compile 1C role from JSON
+# role-compile v1.2 — Compile 1C role from JSON
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import json
@@ -454,6 +454,10 @@ def main():
     role_name = str(defn['name'])
     synonym = str(defn['synonym']) if defn.get('synonym') else role_name
     comment = str(defn['comment']) if defn.get('comment') else ''
+
+    # Synonym: accept "rights" as alias for "objects"
+    if not defn.get('objects') and defn.get('rights'):
+        defn['objects'] = defn['rights']
 
     # --- 2. Parse all object entries ---
     parsed_objects = []

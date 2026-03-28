@@ -294,7 +294,7 @@ $defaultFormatIndex = Register-Format -key $defaultFormatKey -props @{ Width = $
 
 # 6b. Column width formats
 $colFormatMap = @{}  # 1-based col -> format index
-foreach ($col in $colWidthMap.Keys) {
+foreach ($col in ($colWidthMap.Keys | Sort-Object)) {
 	$w = $colWidthMap[$col]
 	$key = Get-FormatKey -width $w
 	$idx = Register-Format -key $key -props @{ Width = $w }

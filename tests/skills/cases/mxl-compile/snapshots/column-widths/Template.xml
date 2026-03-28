@@ -14,7 +14,7 @@
 		<columnsItem>
 			<index>0</index>
 			<column>
-				<formatIndex>4</formatIndex>
+				<formatIndex>2</formatIndex>
 			</column>
 		</columnsItem>
 		<columnsItem>
@@ -38,13 +38,13 @@
 		<columnsItem>
 			<index>4</index>
 			<column>
-				<formatIndex>2</formatIndex>
+				<formatIndex>4</formatIndex>
 			</column>
 		</columnsItem>
 		<columnsItem>
 			<index>5</index>
 			<column>
-				<formatIndex>2</formatIndex>
+				<formatIndex>4</formatIndex>
 			</column>
 		</columnsItem>
 	</columns>
@@ -147,13 +147,13 @@
 		<width>20</width>
 	</format>
 	<format>
-		<width>30</width>
+		<width>10</width>
 	</format>
 	<format>
 		<width>40</width>
 	</format>
 	<format>
-		<width>10</width>
+		<width>30</width>
 	</format>
 	<format>
 		<font>0</font>

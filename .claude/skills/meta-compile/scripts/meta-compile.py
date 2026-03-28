@@ -2000,7 +2000,7 @@ def emit_url_template(indent, tmpl_name, tmpl_def):
     X(f'{indent}\t</Properties>')
     if methods:
         X(f'{indent}\t<ChildObjects>')
-        for method_name, http_method in methods.items():
+        for method_name, http_method in sorted(methods.items()):
             method_uuid = new_uuid()
             method_synonym = split_camel_case(method_name)
             handler = f'{tmpl_name}{method_name}'
@@ -2051,7 +2051,7 @@ def emit_operation(indent, op_name, op_def):
     X(f'{indent}\t</Properties>')
     if params:
         X(f'{indent}\t<ChildObjects>')
-        for param_name, param_def in params.items():
+        for param_name, param_def in sorted(params.items()):
             param_uuid = new_uuid()
             param_synonym = split_camel_case(param_name)
             param_type = 'xs:string'
@@ -2312,7 +2312,7 @@ if obj_type == 'HTTPService':
     if url_templates:
         has_children = True
         X('\t\t<ChildObjects>')
-        for tmpl_name in url_tmpl_order:
+        for tmpl_name in sorted(url_tmpl_order):
             emit_url_template('\t\t\t', tmpl_name, url_templates[tmpl_name])
         X('\t\t</ChildObjects>')
     else:
@@ -2329,7 +2329,7 @@ if obj_type == 'WebService':
     if operations:
         has_children = True
         X('\t\t<ChildObjects>')
-        for op_name in op_order:
+        for op_name in sorted(op_order):
             emit_operation('\t\t\t', op_name, operations[op_name])
         X('\t\t</ChildObjects>')
     else:

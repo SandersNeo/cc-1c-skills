@@ -973,8 +973,16 @@ if elements_list:
         target_ci = root_ci
 
     if target_ci is None:
-        # Create ChildItems section in form
-        target_ci = etree.SubElement(root, f"{{{FORM_NS}}}ChildItems")
+        # Create ChildItems section in form — insert after Events or AutoCommandBar
+        target_ci = etree.Element(f"{{{FORM_NS}}}ChildItems")
+        insert_after = root.find("f:Events", NS)
+        if insert_after is None:
+            insert_after = root.find("f:AutoCommandBar", NS)
+        if insert_after is not None:
+            idx = list(root).index(insert_after) + 1
+            root.insert(idx, target_ci)
+        else:
+            root.append(target_ci)
         root_ci = target_ci
 
     # Detect indent level

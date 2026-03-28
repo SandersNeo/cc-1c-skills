@@ -97,6 +97,10 @@ def main():
     explanation = str(defn['explanation']) if defn.get('explanation') else ''
     picture = str(defn['picture']) if defn.get('picture') else ''
 
+    # Synonym: accept "objects" as alias for "content"
+    if not defn.get('content') and defn.get('objects'):
+        defn['content'] = defn['objects']
+
     content_items = []
     if defn.get('content'):
         for c in defn['content']:

@@ -1160,9 +1160,9 @@ def emit_order(lines, items, indent, skip_auto=False):
                 parts = item.split()
                 field = parts[0]
                 direction = 'Asc'
-                if len(parts) > 1 and re.match(r'^(?i)desc$', parts[1]):
+                if len(parts) > 1 and re.match(r'(?i)^desc$', parts[1]):
                     direction = 'Desc'
-                elif len(parts) > 1 and re.match(r'^(?i)asc$', parts[1]):
+                elif len(parts) > 1 and re.match(r'(?i)^asc$', parts[1]):
                     direction = 'Asc'
                 lines.append(f'{indent}\t<dcsset:item xsi:type="dcsset:OrderItemField">')
                 lines.append(f'{indent}\t\t<dcsset:field>{esc_xml(field)}</dcsset:field>')
@@ -1369,7 +1369,7 @@ def parse_structure_shorthand(s):
         seg = segments[i].strip()
         group = {'type': 'group'}
 
-        if re.match(r'^(?i)(details|\u0434\u0435\u0442\u0430\u043b\u0438)$', seg):
+        if re.match(r'(?i)^(details|\u0434\u0435\u0442\u0430\u043b\u0438)$', seg):
             group['groupBy'] = []
         else:
             group['groupBy'] = [seg]
