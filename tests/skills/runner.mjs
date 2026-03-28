@@ -185,12 +185,17 @@ function buildArgs(skillConfig, caseData, workDir, inputFilePath, runtime) {
       default:
         if (mapping.from.startsWith('case.')) {
           const field = mapping.from.slice(5);
-          const val = caseData[field] ?? caseData.params?.[field] ?? '';
+          const val = caseData.params?.[field] ?? caseData[field] ?? '';
           args.push(String(val));
         } else if (mapping.from === 'literal') {
           args.push(mapping.value || '');
         }
     }
+  }
+
+  // Append extra args from case (for optional params like -Vendor, -Version)
+  if (caseData.args_extra) {
+    args.push(...caseData.args_extra);
   }
 
   return { scriptPath, args };

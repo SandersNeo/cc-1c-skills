@@ -1,0 +1,12 @@
+{
+  "script": "cf-init/scripts/cf-init",
+  "setup": "none",
+  "args": [
+    { "flag": "-Name", "from": "case.name" },
+    { "flag": "-OutputDir", "from": "workDir" }
+  ],
+  "snapshot": {
+    "root": "workDir",
+    "normalizeUuids": true
+  }
+}
