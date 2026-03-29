@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# meta-edit v1.4 — Edit existing 1C metadata object XML (inline mode + complex properties + TS attribute ops + modify-ts)
+# meta-edit v1.5 — Edit existing 1C metadata object XML (inline mode + complex properties + TS attribute ops + modify-ts)
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 
 import argparse
@@ -75,6 +75,82 @@ def localname(el):
 
 def esc_xml(s):
     return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
+
+
+# ============================================================
+# Enum value normalization (same as meta-compile)
+# ============================================================
+
+enum_value_aliases = {
+    # RegisterType (AccumulationRegister)
+    'Balances': 'Balance', 'Остатки': 'Balance', 'Обороты': 'Turnovers',
+    # WriteMode (InformationRegister)
+    'RecordSubordinate': 'RecorderSubordinate', 'Subordinate': 'RecorderSubordinate',
+    'ПодчинениеРегистратору': 'RecorderSubordinate', 'Независимый': 'Independent',
+    # DependenceOnCalculationTypes (ChartOfCalculationTypes)
+    'NotDependOnCalculationTypes': 'DontUse', 'NoDependence': 'DontUse',
+    'Depend': 'RequireCalculationTypes', 'RequireCalculation': 'RequireCalculationTypes',
+    # InformationRegisterPeriodicity
+    'None': 'Nonperiodical', 'Daily': 'Day', 'Monthly': 'Month',
+    'Quarterly': 'Quarter', 'Yearly': 'Year',
+    'Непериодический': 'Nonperiodical', 'Секунда': 'Second', 'День': 'Day',
+    'Месяц': 'Month', 'Квартал': 'Quarter', 'Год': 'Year',
+    'ПозицияРегистратора': 'RecorderPosition',
+    # DataLockControlMode
+    'Автоматический': 'Automatic', 'Управляемый': 'Managed',
+    # FullTextSearch
+    'Использовать': 'Use', 'НеИспользовать': 'DontUse',
+    # Posting
+    'Разрешить': 'Allow', 'Запретить': 'Deny',
+    # EditType
+    'ВДиалоге': 'InDialog', 'ВСписке': 'InList', 'ОбаСпособа': 'BothWays',
+    # DefaultPresentation
+    'ВВидеНаименования': 'AsDescription', 'ВВидеКода': 'AsCode',
+    # FillChecking
+    'НеПроверять': 'DontCheck', 'Ошибка': 'ShowError', 'Предупреждение': 'ShowWarning',
+    # Indexing
+    'НеИндексировать': 'DontIndex', 'Индексировать': 'Index',
+    'ИндексироватьСДопУпорядочиванием': 'IndexWithAdditionalOrder',
+}
+
+valid_enum_values = {
+    'RegisterType': ['Balance', 'Turnovers'],
+    'WriteMode': ['Independent', 'RecorderSubordinate'],
+    'InformationRegisterPeriodicity': ['Nonperiodical', 'Second', 'Day', 'Month', 'Quarter', 'Year', 'RecorderPosition'],
+    'DependenceOnCalculationTypes': ['DontUse', 'RequireCalculationTypes'],
+    'DataLockControlMode': ['Automatic', 'Managed'],
+    'FullTextSearch': ['Use', 'DontUse'],
+    'DataHistory': ['Use', 'DontUse'],
+    'DefaultPresentation': ['AsDescription', 'AsCode'],
+    'Posting': ['Allow', 'Deny'],
+    'RealTimePosting': ['Allow', 'Deny'],
+    'EditType': ['InDialog', 'InList', 'BothWays'],
+    'HierarchyType': ['HierarchyFoldersAndItems', 'HierarchyItemsOnly'],
+    'CodeType': ['String', 'Number'],
+    'CodeAllowedLength': ['Variable', 'Fixed'],
+    'NumberType': ['String', 'Number'],
+    'NumberAllowedLength': ['Variable', 'Fixed'],
+    'RegisterRecordsDeletion': ['AutoDelete', 'AutoDeleteOnUnpost', 'AutoDeleteOff'],
+    'RegisterRecordsWritingOnPost': ['WriteModified', 'WriteSelected', 'WriteAll'],
+    'ReturnValuesReuse': ['DontUse', 'DuringRequest', 'DuringSession'],
+    'ReuseSessions': ['DontUse', 'AutoUse'],
+    'FillChecking': ['DontCheck', 'ShowError', 'ShowWarning'],
+    'Indexing': ['DontIndex', 'Index', 'IndexWithAdditionalOrder'],
+}
+
+
+def normalize_enum_value(prop_name, value):
+    # 1. Check alias dictionary
+    if value in enum_value_aliases:
+        return enum_value_aliases[value]
+    # 2. Case-insensitive match against valid values
+    valid = valid_enum_values.get(prop_name)
+    if valid:
+        for v in valid:
+            if v.lower() == value.lower():
+                return v
+    # 3. Return as-is (validator will catch if wrong)
+    return value
 
 
 def new_uuid():
@@ -552,8 +628,8 @@ def parse_attribute_shorthand(val):
         "synonym": str(val.get("synonym", "")) if val.get("synonym") else split_camel_case(name),
         "comment": str(val.get("comment", "")),
         "flags": list(val.get("flags", [])),
-        "fillChecking": str(val.get("fillChecking", "")),
-        "indexing": str(val.get("indexing", "")),
+        "fillChecking": normalize_enum_value("FillChecking", str(val.get("fillChecking", ""))) if val.get("fillChecking") else "",
+        "indexing": normalize_enum_value("Indexing", str(val.get("indexing", ""))) if val.get("indexing") else "",
         "after": str(val.get("after", "")),
         "before": str(val.get("before", "")),
     }
@@ -986,7 +1062,7 @@ def build_column_fragment(col_def, indent):
         name = str(col_def.get("name", ""))
         synonym = str(col_def.get("synonym", "")) if col_def.get("synonym") else split_camel_case(name)
         if col_def.get("indexing"):
-            indexing = str(col_def["indexing"])
+            indexing = normalize_enum_value("Indexing", str(col_def["indexing"]))
         if col_def.get("references"):
             references = list(col_def["references"])
 
@@ -1823,6 +1899,8 @@ def modify_child_elements(modify_def, child_type):
                     value_str = str(change_value)
                     if isinstance(change_value, bool):
                         value_str = "true" if change_value else "false"
+                    else:
+                        value_str = normalize_enum_value(change_prop, value_str)
                     # Clear children and set text
                     for ch in list(scalar_el):
                         scalar_el.remove(ch)

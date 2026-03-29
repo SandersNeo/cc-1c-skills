@@ -1,4 +1,4 @@
-﻿# meta-edit v1.4 — Edit existing 1C metadata object XML (inline mode + complex properties + TS attribute ops + modify-ts)
+﻿# meta-edit v1.5 — Edit existing 1C metadata object XML (inline mode + complex properties + TS attribute ops + modify-ts)
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$DefinitionFile,
@@ -41,6 +41,55 @@ if ($DefinitionFile -and $Operation) {
 if (-not $DefinitionFile -and -not $Operation) {
 	Write-Error "Either -DefinitionFile or -Operation is required"
 	exit 1
+}
+
+# --- Enum value normalization (same as meta-compile) ---
+$script:enumValueAliases = @{
+	"Balances" = "Balance"; "Остатки" = "Balance"; "Обороты" = "Turnovers"
+	"RecordSubordinate" = "RecorderSubordinate"; "Subordinate" = "RecorderSubordinate"
+	"ПодчинениеРегистратору" = "RecorderSubordinate"; "Независимый" = "Independent"
+	"NotDependOnCalculationTypes" = "DontUse"; "NoDependence" = "DontUse"
+	"None" = "Nonperiodical"; "Daily" = "Day"; "Monthly" = "Month"
+	"Quarterly" = "Quarter"; "Yearly" = "Year"
+	"Непериодический" = "Nonperiodical"; "День" = "Day"; "Месяц" = "Month"
+	"Квартал" = "Quarter"; "Год" = "Year"
+	"Автоматический" = "Automatic"; "Управляемый" = "Managed"
+	"Использовать" = "Use"; "НеИспользовать" = "DontUse"
+	"Разрешить" = "Allow"; "Запретить" = "Deny"
+	"НеПроверять" = "DontCheck"; "Ошибка" = "ShowError"; "Предупреждение" = "ShowWarning"
+	"НеИндексировать" = "DontIndex"; "Индексировать" = "Index"
+	"ИндексироватьСДопУпорядочиванием" = "IndexWithAdditionalOrder"
+}
+
+$script:validEnumValues = @{
+	"RegisterType" = @("Balance","Turnovers")
+	"WriteMode" = @("Independent","RecorderSubordinate")
+	"InformationRegisterPeriodicity" = @("Nonperiodical","Second","Day","Month","Quarter","Year","RecorderPosition")
+	"DependenceOnCalculationTypes" = @("DontUse","RequireCalculationTypes")
+	"DataLockControlMode" = @("Automatic","Managed")
+	"FullTextSearch" = @("Use","DontUse")
+	"DataHistory" = @("Use","DontUse")
+	"DefaultPresentation" = @("AsDescription","AsCode")
+	"Posting" = @("Allow","Deny")
+	"RealTimePosting" = @("Allow","Deny")
+	"EditType" = @("InDialog","InList","BothWays")
+	"HierarchyType" = @("HierarchyFoldersAndItems","HierarchyItemsOnly")
+	"FillChecking" = @("DontCheck","ShowError","ShowWarning")
+	"Indexing" = @("DontIndex","Index","IndexWithAdditionalOrder")
+}
+
+function Normalize-EnumValue {
+	param([string]$propName, [string]$value)
+	if ($script:enumValueAliases.ContainsKey($value)) {
+		return $script:enumValueAliases[$value]
+	}
+	$valid = $script:validEnumValues[$propName]
+	if ($valid) {
+		foreach ($v in $valid) {
+			if ($v -ieq $value) { return $v }
+		}
+	}
+	return $value
 }
 
 # --- Load JSON definition (DefinitionFile mode) ---
@@ -756,7 +805,7 @@ function Build-AttributeFragment {
 	# FillChecking
 	$fillChecking = "DontCheck"
 	if ($parsed.flags -contains "req") { $fillChecking = "ShowError" }
-	if ($parsed.fillChecking) { $fillChecking = $parsed.fillChecking }
+	if ($parsed.fillChecking) { $fillChecking = Normalize-EnumValue "FillChecking" $parsed.fillChecking }
 	$sb.AppendLine("$indent`t`t<FillChecking>$fillChecking</FillChecking>") | Out-Null
 
 	$sb.AppendLine("$indent`t`t<ChoiceFoldersAndItems>Items</ChoiceFoldersAndItems>") | Out-Null
@@ -778,7 +827,7 @@ function Build-AttributeFragment {
 		$indexing = "DontIndex"
 		if ($parsed.flags -contains "index") { $indexing = "Index" }
 		if ($parsed.flags -contains "indexadditional") { $indexing = "IndexWithAdditionalOrder" }
-		if ($parsed.indexing) { $indexing = $parsed.indexing }
+		if ($parsed.indexing) { $indexing = Normalize-EnumValue "Indexing" $parsed.indexing }
 		$sb.AppendLine("$indent`t`t<Indexing>$indexing</Indexing>") | Out-Null
 
 		$sb.AppendLine("$indent`t`t<FullTextSearch>Use</FullTextSearch>") | Out-Null
@@ -2040,6 +2089,8 @@ function Modify-ChildElements($modifyDef, [string]$childType) {
 						$valueStr = "$changeValue"
 						if ($changeValue -is [bool]) {
 							$valueStr = if ($changeValue) { "true" } else { "false" }
+						} else {
+							$valueStr = Normalize-EnumValue $changeProp $valueStr
 						}
 						$scalarEl.InnerText = $valueStr
 						Info "Modified $xmlTag '$elemName'.$changeProp = $valueStr"
