@@ -248,6 +248,7 @@
 			<Language>Русский</Language>
 			<Catalog>Номенклатура</Catalog>
 			<DataProcessor>Загрузка</DataProcessor>
+			<Role>ЧтениеНоменклатуры</Role>
 		</ChildObjects>
 	</Configuration>
 </MetaDataObject>

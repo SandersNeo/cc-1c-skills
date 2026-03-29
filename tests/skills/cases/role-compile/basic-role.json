@@ -3,8 +3,14 @@
   "preRun": [
     {
       "script": "meta-compile/scripts/meta-compile",
-      "input": { "type": "Catalog", "name": "Товары" },
-      "args": { "-JsonPath": "{inputFile}", "-OutputDir": "{workDir}" }
+      "input": {
+        "type": "Catalog",
+        "name": "Товары"
+      },
+      "args": {
+        "-JsonPath": "{inputFile}",
+        "-OutputDir": "{workDir}"
+      }
     }
   ],
   "input": {
@@ -14,6 +20,9 @@
     ]
   },
   "expect": {
-    "files": ["Кладовщик.xml", "Кладовщик/Ext/Rights.xml"]
+    "files": [
+      "Roles/Кладовщик.xml",
+      "Roles/Кладовщик/Ext/Rights.xml"
+    ]
   }
 }

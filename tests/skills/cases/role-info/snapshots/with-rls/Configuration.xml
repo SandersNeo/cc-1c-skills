@@ -248,6 +248,7 @@
 			<Language>Русский</Language>
 			<Catalog>Организации</Catalog>
 			<Document>Реализация</Document>
+			<Role>ОграниченноеЧтение</Role>
 		</ChildObjects>
 	</Configuration>
 </MetaDataObject>

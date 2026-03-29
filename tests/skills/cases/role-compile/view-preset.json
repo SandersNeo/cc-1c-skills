@@ -3,13 +3,25 @@
   "preRun": [
     {
       "script": "meta-compile/scripts/meta-compile",
-      "input": { "type": "Catalog", "name": "Номенклатура" },
-      "args": { "-JsonPath": "{inputFile}", "-OutputDir": "{workDir}" }
+      "input": {
+        "type": "Catalog",
+        "name": "Номенклатура"
+      },
+      "args": {
+        "-JsonPath": "{inputFile}",
+        "-OutputDir": "{workDir}"
+      }
     },
     {
       "script": "meta-compile/scripts/meta-compile",
-      "input": { "type": "DataProcessor", "name": "Загрузка" },
-      "args": { "-JsonPath": "{inputFile}", "-OutputDir": "{workDir}" }
+      "input": {
+        "type": "DataProcessor",
+        "name": "Загрузка"
+      },
+      "args": {
+        "-JsonPath": "{inputFile}",
+        "-OutputDir": "{workDir}"
+      }
     }
   ],
   "input": {
@@ -21,6 +33,9 @@
     ]
   },
   "expect": {
-    "files": ["ЧтениеНоменклатуры.xml", "ЧтениеНоменклатуры/Ext/Rights.xml"]
+    "files": [
+      "Roles/ЧтениеНоменклатуры.xml",
+      "Roles/ЧтениеНоменклатуры/Ext/Rights.xml"
+    ]
   }
 }

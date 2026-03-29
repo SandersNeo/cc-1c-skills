@@ -247,6 +247,7 @@
 		<ChildObjects>
 			<Language>Русский</Language>
 			<Catalog>Товары</Catalog>
+			<Role>Тест</Role>
 		</ChildObjects>
 	</Configuration>
 </MetaDataObject>

@@ -3,18 +3,36 @@
   "preRun": [
     {
       "script": "meta-compile/scripts/meta-compile",
-      "input": { "type": "Catalog", "name": "Товары" },
-      "args": { "-JsonPath": "{inputFile}", "-OutputDir": "{workDir}" }
+      "input": {
+        "type": "Catalog",
+        "name": "Товары"
+      },
+      "args": {
+        "-JsonPath": "{inputFile}",
+        "-OutputDir": "{workDir}"
+      }
     },
     {
       "script": "meta-compile/scripts/meta-compile",
-      "input": { "type": "Document", "name": "Продажа" },
-      "args": { "-JsonPath": "{inputFile}", "-OutputDir": "{workDir}" }
+      "input": {
+        "type": "Document",
+        "name": "Продажа"
+      },
+      "args": {
+        "-JsonPath": "{inputFile}",
+        "-OutputDir": "{workDir}"
+      }
     },
     {
       "script": "meta-compile/scripts/meta-compile",
-      "input": { "type": "InformationRegister", "name": "Цены" },
-      "args": { "-JsonPath": "{inputFile}", "-OutputDir": "{workDir}" }
+      "input": {
+        "type": "InformationRegister",
+        "name": "Цены"
+      },
+      "args": {
+        "-JsonPath": "{inputFile}",
+        "-OutputDir": "{workDir}"
+      }
     },
     {
       "script": "role-compile/scripts/role-compile",
@@ -26,9 +44,16 @@
           "InformationRegister.Цены: Read, Update"
         ]
       },
-      "args": { "-JsonPath": "{inputFile}", "-OutputDir": "{workDir}" }
+      "args": {
+        "-JsonPath": "{inputFile}",
+        "-OutputDir": "{workDir}"
+      }
     }
   ],
-  "params": { "rightsPath": "Комплексная/Ext/Rights.xml" },
-  "expect": { "stdoutContains": "Catalog" }
+  "params": {
+    "rightsPath": "Roles/Комплексная/Ext/Rights.xml"
+  },
+  "expect": {
+    "stdoutContains": "Catalog"
+  }
 }

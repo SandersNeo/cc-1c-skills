@@ -3,13 +3,25 @@
   "preRun": [
     {
       "script": "meta-compile/scripts/meta-compile",
-      "input": { "type": "Catalog", "name": "Организации" },
-      "args": { "-JsonPath": "{inputFile}", "-OutputDir": "{workDir}" }
+      "input": {
+        "type": "Catalog",
+        "name": "Организации"
+      },
+      "args": {
+        "-JsonPath": "{inputFile}",
+        "-OutputDir": "{workDir}"
+      }
     },
     {
       "script": "meta-compile/scripts/meta-compile",
-      "input": { "type": "Document", "name": "РеализацияТоваровУслуг" },
-      "args": { "-JsonPath": "{inputFile}", "-OutputDir": "{workDir}" }
+      "input": {
+        "type": "Document",
+        "name": "РеализацияТоваровУслуг"
+      },
+      "args": {
+        "-JsonPath": "{inputFile}",
+        "-OutputDir": "{workDir}"
+      }
     }
   ],
   "input": {
@@ -17,13 +29,25 @@
     "synonym": "Чтение документов (ограничение по организации)",
     "objects": [
       "Catalog.Организации: @view",
-      { "name": "Document.РеализацияТоваровУслуг", "preset": "view", "rls": { "Read": "#ДляОбъекта(\"\")" } }
+      {
+        "name": "Document.РеализацияТоваровУслуг",
+        "preset": "view",
+        "rls": {
+          "Read": "#ДляОбъекта(\"\")"
+        }
+      }
     ],
     "templates": [
-      { "name": "ДляОбъекта(Модификатор)", "condition": "ГДЕ Организация = &ТекущаяОрганизация" }
+      {
+        "name": "ДляОбъекта(Модификатор)",
+        "condition": "ГДЕ Организация = &ТекущаяОрганизация"
+      }
     ]
   },
   "expect": {
-    "files": ["ЧтениеДокументовПоОрганизации.xml", "ЧтениеДокументовПоОрганизации/Ext/Rights.xml"]
+    "files": [
+      "Roles/ЧтениеДокументовПоОрганизации.xml",
+      "Roles/ЧтениеДокументовПоОрганизации/Ext/Rights.xml"
+    ]
   }
 }

@@ -247,6 +247,7 @@
 		<ChildObjects>
 			<Language>Русский</Language>
 			<InformationRegister>Цены</InformationRegister>
+			<Role>ПравоЦен</Role>
 		</ChildObjects>
 	</Configuration>
 </MetaDataObject>

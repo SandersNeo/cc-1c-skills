@@ -1,4 +1,4 @@
-﻿# role-compile v1.2 — Compile 1C role from JSON
+﻿# role-compile v1.3 — Compile 1C role from JSON
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[Parameter(Mandatory)]
@@ -615,14 +615,25 @@ $outDir = if ([System.IO.Path]::IsPathRooted($OutputDir)) {
 	Join-Path (Get-Location) $OutputDir
 }
 
-# Metadata: OutputDir/RoleName.xml
-$metadataPath = Join-Path $outDir "$roleName.xml"
-if (-not (Test-Path $outDir)) {
-	New-Item -ItemType Directory -Path $outDir -Force | Out-Null
+# Determine Roles dir and config root
+# Back-compat: if OutputDir leaf is "Roles", use as-is; otherwise treat as config root
+$leaf = Split-Path $outDir -Leaf
+if ($leaf -eq "Roles") {
+	$rolesDir = $outDir
+	$configDir = Split-Path $outDir -Parent
+} else {
+	$rolesDir = Join-Path $outDir "Roles"
+	$configDir = $outDir
 }
 
-# Rights: OutputDir/RoleName/Ext/Rights.xml
-$roleSubDir = Join-Path $outDir $roleName
+# Metadata: Roles/RoleName.xml
+$metadataPath = Join-Path $rolesDir "$roleName.xml"
+if (-not (Test-Path $rolesDir)) {
+	New-Item -ItemType Directory -Path $rolesDir -Force | Out-Null
+}
+
+# Rights: Roles/RoleName/Ext/Rights.xml
+$roleSubDir = Join-Path $rolesDir $roleName
 $extDir = Join-Path $roleSubDir "Ext"
 $rightsPath = Join-Path $extDir "Rights.xml"
 if (-not (Test-Path $extDir)) {
@@ -635,7 +646,6 @@ $enc = New-Object System.Text.UTF8Encoding($true)
 
 # --- 12. Register in Configuration.xml ---
 
-$configDir = Split-Path $outDir -Parent
 $configXmlPath = Join-Path $configDir "Configuration.xml"
 $regResult = $null
 

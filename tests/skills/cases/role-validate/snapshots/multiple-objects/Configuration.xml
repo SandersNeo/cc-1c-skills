@@ -248,6 +248,7 @@
 			<Language>Русский</Language>
 			<Catalog>Товары</Catalog>
 			<Document>Заказ</Document>
+			<Role>Менеджер</Role>
 		</ChildObjects>
 	</Configuration>
 </MetaDataObject>

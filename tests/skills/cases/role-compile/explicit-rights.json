@@ -3,8 +3,14 @@
   "preRun": [
     {
       "script": "meta-compile/scripts/meta-compile",
-      "input": { "type": "InformationRegister", "name": "Цены" },
-      "args": { "-JsonPath": "{inputFile}", "-OutputDir": "{workDir}" }
+      "input": {
+        "type": "InformationRegister",
+        "name": "Цены"
+      },
+      "args": {
+        "-JsonPath": "{inputFile}",
+        "-OutputDir": "{workDir}"
+      }
     }
   ],
   "input": {
@@ -15,6 +21,9 @@
     ]
   },
   "expect": {
-    "files": ["ПравоЦен.xml", "ПравоЦен/Ext/Rights.xml"]
+    "files": [
+      "Roles/ПравоЦен.xml",
+      "Roles/ПравоЦен/Ext/Rights.xml"
+    ]
   }
 }

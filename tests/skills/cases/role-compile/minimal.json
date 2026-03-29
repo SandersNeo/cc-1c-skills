@@ -4,6 +4,9 @@
     "name": "Пустая"
   },
   "expect": {
-    "files": ["Пустая.xml", "Пустая/Ext/Rights.xml"]
+    "files": [
+      "Roles/Пустая.xml",
+      "Roles/Пустая/Ext/Rights.xml"
+    ]
   }
 }

@@ -3,8 +3,14 @@
   "preRun": [
     {
       "script": "meta-compile/scripts/meta-compile",
-      "input": { "type": "Document", "name": "РеализацияТоваров" },
-      "args": { "-JsonPath": "{inputFile}", "-OutputDir": "{workDir}" }
+      "input": {
+        "type": "Document",
+        "name": "РеализацияТоваров"
+      },
+      "args": {
+        "-JsonPath": "{inputFile}",
+        "-OutputDir": "{workDir}"
+      }
     }
   ],
   "input": {
@@ -15,6 +21,9 @@
     ]
   },
   "expect": {
-    "files": ["РедакторДокументов.xml", "РедакторДокументов/Ext/Rights.xml"]
+    "files": [
+      "Roles/РедакторДокументов.xml",
+      "Roles/РедакторДокументов/Ext/Rights.xml"
+    ]
   }
 }

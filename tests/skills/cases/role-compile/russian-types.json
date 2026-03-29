@@ -3,8 +3,14 @@
   "preRun": [
     {
       "script": "meta-compile/scripts/meta-compile",
-      "input": { "type": "Catalog", "name": "Контрагенты" },
-      "args": { "-JsonPath": "{inputFile}", "-OutputDir": "{workDir}" }
+      "input": {
+        "type": "Catalog",
+        "name": "Контрагенты"
+      },
+      "args": {
+        "-JsonPath": "{inputFile}",
+        "-OutputDir": "{workDir}"
+      }
     }
   ],
   "input": {
@@ -15,6 +21,9 @@
     ]
   },
   "expect": {
-    "files": ["ЧтениеКонтрагентов.xml", "ЧтениеКонтрагентов/Ext/Rights.xml"]
+    "files": [
+      "Roles/ЧтениеКонтрагентов.xml",
+      "Roles/ЧтениеКонтрагентов/Ext/Rights.xml"
+    ]
   }
 }

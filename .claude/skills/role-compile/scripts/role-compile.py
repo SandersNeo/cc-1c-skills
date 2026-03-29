@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# role-compile v1.2 — Compile 1C role from JSON
+# role-compile v1.3 — Compile 1C role from JSON
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import json
@@ -563,12 +563,22 @@ def main():
     if not os.path.isabs(out_dir):
         out_dir = os.path.join(os.getcwd(), out_dir)
 
-    # Metadata: OutputDir/RoleName.xml
-    metadata_path = os.path.join(out_dir, f'{role_name}.xml')
-    os.makedirs(out_dir, exist_ok=True)
+    # Determine Roles dir and config root
+    # Back-compat: if OutputDir leaf is "Roles", use as-is; otherwise treat as config root
+    leaf = os.path.basename(out_dir.rstrip(os.sep).rstrip('/'))
+    if leaf == 'Roles':
+        roles_dir = out_dir
+        config_dir = os.path.dirname(out_dir)
+    else:
+        roles_dir = os.path.join(out_dir, 'Roles')
+        config_dir = out_dir
 
-    # Rights: OutputDir/RoleName/Ext/Rights.xml
-    role_sub_dir = os.path.join(out_dir, role_name)
+    # Metadata: Roles/RoleName.xml
+    metadata_path = os.path.join(roles_dir, f'{role_name}.xml')
+    os.makedirs(roles_dir, exist_ok=True)
+
+    # Rights: Roles/RoleName/Ext/Rights.xml
+    role_sub_dir = os.path.join(roles_dir, role_name)
     ext_dir = os.path.join(role_sub_dir, 'Ext')
     rights_path = os.path.join(ext_dir, 'Rights.xml')
     os.makedirs(ext_dir, exist_ok=True)
@@ -577,7 +587,6 @@ def main():
     write_utf8_bom(rights_path, rights_xml)
 
     # --- 7. Register in Configuration.xml ---
-    config_dir = os.path.dirname(out_dir)
     config_xml_path = os.path.join(config_dir, 'Configuration.xml')
     reg_result = None
 

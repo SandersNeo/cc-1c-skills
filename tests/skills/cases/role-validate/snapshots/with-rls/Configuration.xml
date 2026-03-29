@@ -247,6 +247,7 @@
 		<ChildObjects>
 			<Language>Русский</Language>
 			<Document>Продажа</Document>
+			<Role>СОграничениями</Role>
 		</ChildObjects>
 	</Configuration>
 </MetaDataObject>

@@ -248,6 +248,7 @@
 			<Language>Русский</Language>
 			<Catalog>Организации</Catalog>
 			<Document>РеализацияТоваровУслуг</Document>
+			<Role>ЧтениеДокументовПоОрганизации</Role>
 		</ChildObjects>
 	</Configuration>
 </MetaDataObject>
