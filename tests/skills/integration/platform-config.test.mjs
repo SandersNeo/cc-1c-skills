@@ -1,6 +1,6 @@
 // platform-config.test.mjs — Integration test: load config into 1C platform
 // Requires: 1C platform (1cv8.exe) via .v8-project.json
-// Steps: cf-init → meta-compile (objects without forms) → cf-edit → db-create → db-load-xml → db-update
+// Steps: cf-init → meta-compile → form-add → form-compile → cf-edit → db-create → db-load-xml → db-update
 
 export const name = 'Загрузка конфигурации в платформу 1С';
 export const setup = 'none';
@@ -33,6 +33,45 @@ export const steps = [
     script: 'meta-compile/scripts/meta-compile',
     input: { type: 'Enum', name: 'Статусы', values: ['Новый', 'Выполнен'] },
     args: { '-JsonPath': '{inputFile}', '-OutputDir': '{workDir}/config' },
+  },
+  {
+    name: 'form-add: форма элемента справочника',
+    script: 'form-add/scripts/form-add',
+    args: {
+      '-ObjectPath': '{workDir}/config/Catalogs/Товары',
+      '-FormName': 'ФормаЭлемента',
+      '-Purpose': 'Object',
+    },
+  },
+  {
+    name: 'form-compile: наполнение формы справочника',
+    script: 'form-compile/scripts/form-compile',
+    input: {
+      elements: [
+        { id: 'Код', type: 'input', path: 'Object.Code', title: 'Код' },
+        { id: 'Наименование', type: 'input', path: 'Object.Description', title: 'Наименование' },
+      ],
+    },
+    args: { '-FormPath': '{workDir}/config/Catalogs/Товары/Forms/ФормаЭлемента', '-JsonPath': '{inputFile}' },
+  },
+  {
+    name: 'form-add: форма документа',
+    script: 'form-add/scripts/form-add',
+    args: {
+      '-ObjectPath': '{workDir}/config/Documents/Приход',
+      '-FormName': 'ФормаДокумента',
+      '-Purpose': 'Object',
+    },
+  },
+  {
+    name: 'form-compile: наполнение формы документа',
+    script: 'form-compile/scripts/form-compile',
+    input: {
+      elements: [
+        { id: 'Склад', type: 'input', path: 'Object.Склад', title: 'Склад' },
+      ],
+    },
+    args: { '-FormPath': '{workDir}/config/Documents/Приход/Forms/ФормаДокумента', '-JsonPath': '{inputFile}' },
   },
   {
     name: 'cf-edit: регистрация объектов',

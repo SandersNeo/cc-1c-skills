@@ -28,7 +28,28 @@ export const steps = [
     args: { '-ConfigPath': '{workDir}/config', '-DefinitionFile': '{inputFile}' },
   },
 
-  // ── 2. Build extension (borrow without forms) ──
+  {
+    name: 'form-add: форма справочника',
+    script: 'form-add/scripts/form-add',
+    args: {
+      '-ObjectPath': '{workDir}/config/Catalogs/Контрагенты',
+      '-FormName': 'ФормаЭлемента',
+      '-Purpose': 'Object',
+    },
+  },
+  {
+    name: 'form-compile: наполнение формы справочника',
+    script: 'form-compile/scripts/form-compile',
+    input: {
+      elements: [
+        { id: 'Код', type: 'input', path: 'Object.Code', title: 'Код' },
+        { id: 'Наименование', type: 'input', path: 'Object.Description', title: 'Наименование' },
+      ],
+    },
+    args: { '-FormPath': '{workDir}/config/Catalogs/Контрагенты/Forms/ФормаЭлемента', '-JsonPath': '{inputFile}' },
+  },
+
+  // ── 2. Build extension ──
   {
     name: 'cfe-init: расширение',
     script: 'cfe-init/scripts/cfe-init',
