@@ -38,7 +38,7 @@ powershell.exe -NoProfile -File .claude/skills/cf-edit/scripts/cf-edit.ps1 -Conf
 | `remove-defaultRole` | `Role.Name` или `Name` | Удалить роль по умолчанию |
 | `set-defaultRoles` | Имена через `;;` | Заменить список ролей по умолчанию |
 
-Подробнее: `reference.md` в каталоге навыка.
+Допустимые значения свойств, формат DefinitionFile (JSON), каноничный порядок: [reference.md](reference.md)
 
 ## Примеры
 
