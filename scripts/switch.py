@@ -390,6 +390,8 @@ def cmd_link(platform, project_dir):
     print(f"\nГотово! {linked} навыков подключено через {link_type} "
           f"в {target_prefix}/")
     print("Обновления в источнике автоматически подхватятся.")
+    print("⚠ Режим --link экспериментальный. При ошибках запуска "
+          "скриптов переключитесь на копирование (без --link).")
     print_gitignore_recommendations(project_dir)
     print(f"\nДля удаления: python scripts/switch.py --undo claude-code"
           f" --project-dir \"{project_dir}\"")
@@ -636,8 +638,8 @@ def main():
     parser.add_argument('--project-dir', default=os.getcwd(),
                         help='путь к целевому проекту (по умолчанию: текущий каталог)')
     parser.add_argument('--link', action='store_true',
-                        help='создать ссылки (junction/symlink) вместо копирования '
-                             '(только для claude-code)')
+                        help='[экспериментально] создать ссылки (junction/symlink) '
+                             'вместо копирования (только для claude-code)')
 
     args = parser.parse_args()
 
