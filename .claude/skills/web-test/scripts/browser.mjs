@@ -1066,12 +1066,23 @@ function buildSpreadsheetMapping(allCells) {
   const detailRow = rows[detailIdx];
   const groupRow = groupIdx >= 0 ? rows[groupIdx] : null;
 
+  // Detect optional third header level above group row (bounds carry-forward)
+  let superRow = null;
+  if (groupIdx > 0 && nonEmpty(rows[groupIdx - 1]) >= 2) {
+    superRow = rows[groupIdx - 1];
+  }
+
   // Build column names (group + detail merge)
   const groupFilled = new Array(maxCol + 1).fill('');
   if (groupRow) {
     let cur = '';
     for (let c = 0; c <= maxCol; c++) {
-      if (groupRow[c]) cur = groupRow[c];
+      if (groupRow[c]) {
+        cur = groupRow[c];
+      } else if (superRow && superRow[c]) {
+        // New top-level header starts here — stop carry-forward
+        cur = '';
+      }
       groupFilled[c] = cur;
     }
   }
@@ -1091,6 +1102,8 @@ function buildSpreadsheetMapping(allCells) {
       colNames.push(needPrefix ? `${group} / ${detail}` : detail);
     } else if (group) {
       colNames.push(group);
+    } else if (superRow && superRow[c]) {
+      colNames.push(superRow[c]);
     } else {
       colNames.push(null);
     }
