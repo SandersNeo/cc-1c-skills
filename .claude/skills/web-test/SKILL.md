@@ -476,7 +476,12 @@ await deleteTableRow(0, { table: 'Исходящие' });
 
 Table matching accepts both technical name (`tables[].name`) and visual label (`tables[].label`). Label is the group title shown on screen — useful when working from screenshots. Name match takes priority over label match.
 
-### Keyboard shortcuts (via `page.keyboard.press`)
+### Keyboard shortcuts
+
+```js
+const page = await getPage();
+await page.keyboard.press('F8');  // example: create new item in focused reference field
+```
 
 | Key | Context | Action |
 |-----|---------|--------|
