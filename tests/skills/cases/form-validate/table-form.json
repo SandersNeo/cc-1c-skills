@@ -21,7 +21,7 @@
           ]}
         ],
         "attributes": [
-          { "name": "Объект", "type": "ExternalDataProcessorObject.ВалТабл", "main": true },
+          { "name": "Объект", "type": "DataProcessorObject.ВалТабл", "main": true },
           { "name": "Данные", "type": "ValueTable", "columns": [
             { "name": "Наименование", "type": "string(150)" },
             { "name": "Количество", "type": "decimal(10,3)" }

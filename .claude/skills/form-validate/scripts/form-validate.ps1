@@ -738,8 +738,8 @@ if (-not $stopped) {
 				if ($pfx -in $validCfgPrefixes) {
 					# ExternalDataProcessorObject/ExternalReportObject valid only for EPF/ERF, not config
 					if ($script:isConfigContext -and ($pfx -eq "ExternalDataProcessorObject" -or $pfx -eq "ExternalReportObject")) {
-						Report-Warn "12. Type '$tv': External* type in configuration context (use DataProcessorObject/ReportObject instead)"
-						$typeOk = $false
+						Report-Error "12. Type '$tv': External* type in configuration context (use DataProcessorObject/ReportObject instead)"
+						$typeOk = $false; $typeInvalid++
 					}
 					continue
 				}

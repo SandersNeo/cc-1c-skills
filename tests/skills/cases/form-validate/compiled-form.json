@@ -23,7 +23,7 @@
           { "button": "Выполнить", "command": "Выполнить" }
         ],
         "attributes": [
-          { "name": "Объект", "type": "ExternalDataProcessorObject.Валидация", "main": true },
+          { "name": "Объект", "type": "DataProcessorObject.Валидация", "main": true },
           { "name": "Поле1", "type": "string" },
           { "name": "Поле2", "type": "decimal(15,2)" },
           { "name": "Флаг", "type": "boolean" }

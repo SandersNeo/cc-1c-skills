@@ -40,7 +40,7 @@
 	<Attributes>
 		<Attribute name="Объект" id="14">
 			<Type>
-				<v8:Type>cfg:ExternalDataProcessorObject.Валидация</v8:Type>
+				<v8:Type>cfg:DataProcessorObject.Валидация</v8:Type>
 			</Type>
 			<MainAttribute>true</MainAttribute>
 		</Attribute>

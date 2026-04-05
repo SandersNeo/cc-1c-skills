@@ -660,8 +660,8 @@ def main():
                 if prefix in VALID_CFG_PREFIXES or suffix == "DynamicList":
                     # ExternalDataProcessorObject/ExternalReportObject valid only in EPF/ERF context
                     if is_config_context and prefix in ('ExternalDataProcessorObject', 'ExternalReportObject'):
-                        report_warn(f'12. Type "{tv}": External* type in configuration context (use DataProcessorObject/ReportObject instead)')
-                        type_warn_count += 1
+                        report_error(f'12. Type "{tv}": External* type in configuration context (use DataProcessorObject/ReportObject instead)')
+                        type_invalid += 1
                 else:
                     report_warn(f'12. Type "{tv}": unrecognized cfg prefix')
                     type_warn_count += 1
