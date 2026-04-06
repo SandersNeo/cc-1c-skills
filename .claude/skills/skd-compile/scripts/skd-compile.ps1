@@ -1,4 +1,4 @@
-﻿# skd-compile v1.6 — Compile 1C DCS from JSON
+﻿# skd-compile v1.7 — Compile 1C DCS from JSON
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$DefinitionFile,
@@ -1068,7 +1068,7 @@ function Emit-ColorValue {
 }
 
 function Emit-CellAppearance {
-	param($style, [double]$width = 0, [bool]$vMerge = $false, [double]$minHeight = 0, $extraItems = @())
+	param($style, [double]$width = 0, [bool]$vMerge = $false, [bool]$hMerge = $false, [double]$minHeight = 0, $extraItems = @())
 	$ind = "`t`t`t`t`t"
 	X "`t`t`t`t<dcsat:appearance>"
 	# Background color
@@ -1161,6 +1161,13 @@ function Emit-CellAppearance {
 		X "$ind`t<dcscor:value xsi:type=`"xs:boolean`">true</dcscor:value>"
 		X "$ind</dcscor:item>"
 	}
+	# Horizontal merge
+	if ($hMerge) {
+		X "$ind<dcscor:item>"
+		X "$ind`t<dcscor:parameter>ОбъединятьПоГоризонтали</dcscor:parameter>"
+		X "$ind`t<dcscor:value xsi:type=`"xs:boolean`">true</dcscor:value>"
+		X "$ind</dcscor:item>"
+	}
 	# Extra appearance items (e.g. drilldown Расшифровка)
 	foreach ($ei in $extraItems) { X $ei }
 	X "`t`t`t`t</dcsat:appearance>"
@@ -1180,7 +1187,7 @@ function Emit-AreaTemplateDSL {
 	$minHeight = if ($t.minHeight) { [double]$t.minHeight } else { 0 }
 	$colCount = if ($widths.Count -gt 0) { $widths.Count } else { $rows[0].Count }
 
-	# Build merge map: vMerge[row][col] = $true if cell is merged with above
+	# Build vertical merge map: vMerge[row][col] = $true if cell is merged with above
 	$vMerge = @{}
 	for ($r = $rows.Count - 1; $r -ge 1; $r--) {
 		$vMerge[$r] = @{}
@@ -1192,6 +1199,18 @@ function Emit-AreaTemplateDSL {
 		}
 	}
 	if (-not $vMerge.ContainsKey(0)) { $vMerge[0] = @{} }
+
+	# Build horizontal merge map: hMerge[row][col] = $true if cell is merged with left
+	$hMerge = @{}
+	for ($r = 0; $r -lt $rows.Count; $r++) {
+		$hMerge[$r] = @{}
+		for ($c = 0; $c -lt $colCount; $c++) {
+			$cellVal = $rows[$r][$c]
+			if ($cellVal -is [string] -and $cellVal -eq '>') {
+				$hMerge[$r][$c] = $true
+			}
+		}
+	}
 
 	# Build drilldown map: param_name -> drilldown_value
 	$drilldownMap = @{}
@@ -1210,7 +1229,8 @@ function Emit-AreaTemplateDSL {
 		for ($c = 0; $c -lt $colCount; $c++) {
 			$cellVal = $rows[$r][$c]
 			$w = if ($c -lt $widths.Count) { [double]$widths[$c] } else { 0 }
-			$isMerged = $vMerge[$r][$c] -eq $true
+			$isVMerged = $vMerge[$r][$c] -eq $true
+			$isHMerged = $hMerge[$r][$c] -eq $true
 			# Check if this cell starts a vertical merge (next row has "|" in same column)
 			$startsVMerge = $false
 			for ($nr = $r + 1; $nr -lt $rows.Count; $nr++) {
@@ -1218,13 +1238,19 @@ function Emit-AreaTemplateDSL {
 			}
 
 			X "`t`t`t`t<dcsat:tableCell>"
-			if ($isMerged) {
-				# Merged cell — only appearance with vMerge flag + width
+			if ($isVMerged) {
+				# Vertically merged cell — only appearance with vMerge flag + width
 				Emit-CellAppearance $style $w $true
+			} elseif ($isHMerged) {
+				# Horizontally merged cell — only appearance with hMerge flag + width
+				Emit-CellAppearance $style $w $false $true
 			} else {
 				# Cell value
 				if ($null -ne $cellVal -and $cellVal -ne '') {
 					$cellStr = "$cellVal"
+					# Unescape \| and \>
+					if ($cellStr -eq '\|') { $cellStr = '|' }
+					elseif ($cellStr -eq '\>') { $cellStr = '>' }
 					if ($cellStr -match '^\{(.+)\}$') {
 						# Parameter reference
 						$paramName = $Matches[1]
@@ -1255,7 +1281,7 @@ function Emit-AreaTemplateDSL {
 				# Appearance
 				$h = if ($r -eq 0) { $minHeight } else { 0 }
 				if (-not $cellExtraItems) { $cellExtraItems = @() }
-				Emit-CellAppearance $style $w $startsVMerge $h $cellExtraItems
+				Emit-CellAppearance $style $w $startsVMerge $false $h $cellExtraItems
 				$cellExtraItems = @()
 			}
 			X "`t`t`t`t</dcsat:tableCell>"

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# skd-compile v1.6 — Compile 1C DCS from JSON
+# skd-compile v1.7 — Compile 1C DCS from JSON
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import json
@@ -11,6 +11,10 @@ import uuid
 
 def esc_xml(s):
     return s.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;')
+
+def fmt_dec(v):
+    """Format decimal: 30.0 → '30', 16.625 → '16.625' (match PS1 output)."""
+    return str(int(v)) if v == int(v) else str(v)
 
 
 def resolve_query_value(val, base_dir):
@@ -892,7 +896,7 @@ def _emit_color_value(lines, color, indent):
         lines.append(f'{indent}<dcscor:value xsi:type="v8ui:Color">{esc_xml(color)}</dcscor:value>')
 
 
-def _emit_cell_appearance(lines, style, width=0, v_merge=False, min_height=0, extra_items=None):
+def _emit_cell_appearance(lines, style, width=0, v_merge=False, h_merge=False, min_height=0, extra_items=None):
     ind = '\t\t\t\t\t'
     lines.append('\t\t\t\t<dcsat:appearance>')
     # Background color
@@ -956,11 +960,11 @@ def _emit_cell_appearance(lines, style, width=0, v_merge=False, min_height=0, ex
     if width and width > 0:
         lines.append(f'{ind}<dcscor:item>')
         lines.append(f'{ind}\t<dcscor:parameter>\u041c\u0438\u043d\u0438\u043c\u0430\u043b\u044c\u043d\u0430\u044f\u0428\u0438\u0440\u0438\u043d\u0430</dcscor:parameter>')
-        lines.append(f'{ind}\t<dcscor:value xsi:type="xs:decimal">{width}</dcscor:value>')
+        lines.append(f'{ind}\t<dcscor:value xsi:type="xs:decimal">{fmt_dec(width)}</dcscor:value>')
         lines.append(f'{ind}</dcscor:item>')
         lines.append(f'{ind}<dcscor:item>')
         lines.append(f'{ind}\t<dcscor:parameter>\u041c\u0430\u043a\u0441\u0438\u043c\u0430\u043b\u044c\u043d\u0430\u044f\u0428\u0438\u0440\u0438\u043d\u0430</dcscor:parameter>')
-        lines.append(f'{ind}\t<dcscor:value xsi:type="xs:decimal">{width}</dcscor:value>')
+        lines.append(f'{ind}\t<dcscor:value xsi:type="xs:decimal">{fmt_dec(width)}</dcscor:value>')
         lines.append(f'{ind}</dcscor:item>')
     # Min height
     if min_height and min_height > 0:
@@ -972,6 +976,12 @@ def _emit_cell_appearance(lines, style, width=0, v_merge=False, min_height=0, ex
     if v_merge:
         lines.append(f'{ind}<dcscor:item>')
         lines.append(f'{ind}\t<dcscor:parameter>\u041e\u0431\u044a\u0435\u0434\u0438\u043d\u044f\u0442\u044c\u041f\u043e\u0412\u0435\u0440\u0442\u0438\u043a\u0430\u043b\u0438</dcscor:parameter>')
+        lines.append(f'{ind}\t<dcscor:value xsi:type="xs:boolean">true</dcscor:value>')
+        lines.append(f'{ind}</dcscor:item>')
+    # Horizontal merge
+    if h_merge:
+        lines.append(f'{ind}<dcscor:item>')
+        lines.append(f'{ind}\t<dcscor:parameter>\u041e\u0431\u044a\u0435\u0434\u0438\u043d\u044f\u0442\u044c\u041f\u043e\u0413\u043e\u0440\u0438\u0437\u043e\u043d\u0442\u0430\u043b\u0438</dcscor:parameter>')
         lines.append(f'{ind}\t<dcscor:value xsi:type="xs:boolean">true</dcscor:value>')
         lines.append(f'{ind}</dcscor:item>')
     # Extra appearance items (e.g. drilldown)
@@ -993,7 +1003,7 @@ def _emit_area_template_dsl(lines, t):
     min_height = float(t.get('minHeight', 0))
     col_count = len(widths) if widths else len(rows[0])
 
-    # Build merge map
+    # Build vertical merge map
     v_merge = {}
     for r in range(len(rows) - 1, 0, -1):
         v_merge[r] = {}
@@ -1003,6 +1013,15 @@ def _emit_area_template_dsl(lines, t):
                 v_merge[r][c] = True
     if 0 not in v_merge:
         v_merge[0] = {}
+
+    # Build horizontal merge map
+    h_merge = {}
+    for r in range(len(rows)):
+        h_merge[r] = {}
+        for c in range(col_count):
+            cell_val = rows[r][c] if c < len(rows[r]) else None
+            if isinstance(cell_val, str) and cell_val == '>':
+                h_merge[r][c] = True
 
     # Build drilldown map: param_name -> drilldown_value
     drilldown_map = {}
@@ -1020,7 +1039,8 @@ def _emit_area_template_dsl(lines, t):
         for c in range(col_count):
             cell_val = rows[r][c] if c < len(rows[r]) else None
             w = float(widths[c]) if c < len(widths) else 0
-            is_merged = v_merge.get(r, {}).get(c, False)
+            is_v_merged = v_merge.get(r, {}).get(c, False)
+            is_h_merged = h_merge.get(r, {}).get(c, False)
             # Check if this cell starts a vertical merge
             starts_v_merge = False
             for nr in range(r + 1, len(rows)):
@@ -1030,12 +1050,19 @@ def _emit_area_template_dsl(lines, t):
                     break
 
             lines.append('\t\t\t\t<dcsat:tableCell>')
-            if is_merged:
+            if is_v_merged:
                 _emit_cell_appearance(lines, style, w, True)
+            elif is_h_merged:
+                _emit_cell_appearance(lines, style, w, h_merge=True)
             else:
                 cell_extra_items = []
                 if cell_val is not None and str(cell_val) != '':
                     cell_str = str(cell_val)
+                    # Unescape \| and \>
+                    if cell_str == '\\|':
+                        cell_str = '|'
+                    elif cell_str == '\\>':
+                        cell_str = '>'
                     m = re.match(r'^\{(.+)\}$', cell_str)
                     if m:
                         param_name = m.group(1)
@@ -1059,7 +1086,7 @@ def _emit_area_template_dsl(lines, t):
                         lines.append('\t\t\t\t\t\t</dcsat:value>')
                         lines.append('\t\t\t\t\t</dcsat:item>')
                 h = min_height if r == 0 else 0
-                _emit_cell_appearance(lines, style, w, starts_v_merge, h, cell_extra_items or None)
+                _emit_cell_appearance(lines, style, w, starts_v_merge, False, h, cell_extra_items or None)
             lines.append('\t\t\t\t</dcsat:tableCell>')
         lines.append('\t\t\t</dcsat:item>')
 
