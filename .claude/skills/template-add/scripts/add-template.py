@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# add-template v1.0 — Add template to 1C object
+# add-template v1.2 — Add template to 1C object
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 
 import argparse
@@ -63,7 +63,9 @@ def main():
 
     root_xml_path = os.path.join(src_dir, f"{object_name}.xml")
     if not os.path.exists(root_xml_path):
-        print(f"Корневой файл обработки не найден: {root_xml_path}", file=sys.stderr)
+        print(f"Корневой файл объекта не найден: {root_xml_path}", file=sys.stderr)
+        print(f"Ожидается: <SrcDir>/<ObjectName>/<ObjectName>.xml", file=sys.stderr)
+        print(f"Подсказка: SrcDir должен указывать на папку типа объектов (например Reports), а не на корень конфигурации", file=sys.stderr)
         sys.exit(1)
 
     processor_dir = os.path.join(src_dir, object_name)

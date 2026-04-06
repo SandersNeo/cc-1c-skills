@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# skd-compile v1.3 — Compile 1C DCS from JSON
+# skd-compile v1.4 — Compile 1C DCS from JSON
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import json
@@ -232,6 +232,16 @@ def parse_param_shorthand(s):
     if '@autoDates' in s:
         result['autoDates'] = True
         s = re.sub(r'\s*@autoDates', '', s)
+
+    # Extract @valueList flag
+    if '@valueList' in s:
+        result['valueListAllowed'] = True
+        s = re.sub(r'\s*@valueList', '', s)
+
+    # Extract @hidden flag
+    if '@hidden' in s:
+        result['hidden'] = True
+        s = re.sub(r'\s*@hidden', '', s)
 
     # Split "Name: Type = Value"
     m = re.match(r'^([^:]+):\s*(\S+)(\s*=\s*(.+))?$', s)
@@ -598,7 +608,7 @@ def emit_calc_fields(lines, defn):
             is_obj = False
         else:
             parsed = {
-                'dataPath': str(cf.get('dataPath', '')),
+                'dataPath': str(cf.get('dataPath') or cf.get('field', '')),
                 'expression': str(cf.get('expression', '')),
             }
             is_obj = True
@@ -724,9 +734,17 @@ def emit_single_param(lines, p, parsed):
     if parsed.get('expression'):
         lines.append(f'\t\t<expression>{esc_xml(parsed["expression"])}</expression>')
 
+    # Hidden implies availableAsField=false
+    if parsed.get('hidden'):
+        parsed['availableAsField'] = False
+
     # AvailableAsField
     if parsed.get('availableAsField') is False:
         lines.append('\t\t<availableAsField>false</availableAsField>')
+
+    # ValueListAllowed
+    if parsed.get('valueListAllowed'):
+        lines.append('\t\t<valueListAllowed>true</valueListAllowed>')
 
     # Use
     if p is not None and not isinstance(p, str) and p.get('use'):
@@ -735,7 +753,12 @@ def emit_single_param(lines, p, parsed):
     lines.append('\t</parameter>')
 
 
+_all_params = []
+
+
 def emit_parameters(lines, defn):
+    global _all_params
+    _all_params = []
     if not defn.get('parameters'):
         return
     for p in defn['parameters']:
@@ -752,10 +775,22 @@ def emit_parameters(lines, defn):
                 parsed['expression'] = str(p['expression'])
             if p.get('availableAsField') is False:
                 parsed['availableAsField'] = False
+            if p.get('valueListAllowed') is True:
+                parsed['valueListAllowed'] = True
+            if p.get('hidden') is True:
+                parsed['hidden'] = True
             if p.get('autoDates') is True:
                 parsed['autoDates'] = True
 
         emit_single_param(lines, p, parsed)
+
+        # Track parameter for auto dataParameters
+        _all_params.append({
+            'name': parsed['name'],
+            'hidden': bool(parsed.get('hidden')),
+            'type': parsed.get('type', ''),
+            'value': parsed.get('value'),
+        })
 
         # @autoDates: auto-generate ДатаНачала and ДатаОкончания
         if parsed.get('autoDates'):
@@ -827,7 +862,7 @@ def _emit_color_value(lines, color, indent):
         lines.append(f'{indent}<dcscor:value xsi:type="v8ui:Color">{esc_xml(color)}</dcscor:value>')
 
 
-def _emit_cell_appearance(lines, style, width=0, v_merge=False, min_height=0):
+def _emit_cell_appearance(lines, style, width=0, v_merge=False, min_height=0, extra_items=None):
     ind = '\t\t\t\t\t'
     lines.append('\t\t\t\t<dcsat:appearance>')
     # Background color
@@ -909,6 +944,10 @@ def _emit_cell_appearance(lines, style, width=0, v_merge=False, min_height=0):
         lines.append(f'{ind}\t<dcscor:parameter>\u041e\u0431\u044a\u0435\u0434\u0438\u043d\u044f\u0442\u044c\u041f\u043e\u0412\u0435\u0440\u0442\u0438\u043a\u0430\u043b\u0438</dcscor:parameter>')
         lines.append(f'{ind}\t<dcscor:value xsi:type="xs:boolean">true</dcscor:value>')
         lines.append(f'{ind}</dcscor:item>')
+    # Extra appearance items (e.g. drilldown)
+    if extra_items:
+        for ei in extra_items:
+            lines.append(ei)
     lines.append('\t\t\t\t</dcsat:appearance>')
 
 
@@ -935,6 +974,13 @@ def _emit_area_template_dsl(lines, t):
     if 0 not in v_merge:
         v_merge[0] = {}
 
+    # Build drilldown map: param_name -> drilldown_value
+    drilldown_map = {}
+    if t.get('parameters'):
+        for tp in t['parameters']:
+            if tp.get('drilldown'):
+                drilldown_map[str(tp['name'])] = str(tp['drilldown'])
+
     lines.append('\t<template>')
     lines.append(f'\t\t<name>{esc_xml(str(t["name"]))}</name>')
     lines.append('\t\t<template xmlns:dcsat="http://v8.1c.ru/8.1/data-composition-system/area-template" xsi:type="dcsat:AreaTemplate">')
@@ -957,13 +1003,22 @@ def _emit_area_template_dsl(lines, t):
             if is_merged:
                 _emit_cell_appearance(lines, style, w, True)
             else:
+                cell_extra_items = []
                 if cell_val is not None and str(cell_val) != '':
                     cell_str = str(cell_val)
                     m = re.match(r'^\{(.+)\}$', cell_str)
                     if m:
+                        param_name = m.group(1)
                         lines.append('\t\t\t\t\t<dcsat:item xsi:type="dcsat:Field">')
-                        lines.append(f'\t\t\t\t\t\t<dcsat:value xsi:type="dcscor:Parameter">{esc_xml(m.group(1))}</dcsat:value>')
+                        lines.append(f'\t\t\t\t\t\t<dcsat:value xsi:type="dcscor:Parameter">{esc_xml(param_name)}</dcsat:value>')
                         lines.append('\t\t\t\t\t</dcsat:item>')
+                        # Build drilldown appearance extra items
+                        if param_name in drilldown_map:
+                            dd_val = drilldown_map[param_name]
+                            cell_extra_items.append('\t\t\t\t\t<dcscor:item>')
+                            cell_extra_items.append(f'\t\t\t\t\t\t<dcscor:parameter>\u0420\u0430\u0441\u0448\u0438\u0444\u0440\u043e\u0432\u043a\u0430</dcscor:parameter>')
+                            cell_extra_items.append(f'\t\t\t\t\t\t<dcscor:value xsi:type="dcscor:Parameter">\u0420\u0430\u0441\u0448\u0438\u0444\u0440\u043e\u0432\u043a\u0430_{dd_val}</dcscor:value>')
+                            cell_extra_items.append('\t\t\t\t\t</dcscor:item>')
                     else:
                         lines.append('\t\t\t\t\t<dcsat:item xsi:type="dcsat:Field">')
                         lines.append('\t\t\t\t\t\t<dcsat:value xsi:type="v8:LocalStringType">')
@@ -974,7 +1029,7 @@ def _emit_area_template_dsl(lines, t):
                         lines.append('\t\t\t\t\t\t</dcsat:value>')
                         lines.append('\t\t\t\t\t</dcsat:item>')
                 h = min_height if r == 0 else 0
-                _emit_cell_appearance(lines, style, w, starts_v_merge, h)
+                _emit_cell_appearance(lines, style, w, starts_v_merge, h, cell_extra_items or None)
             lines.append('\t\t\t\t</dcsat:tableCell>')
         lines.append('\t\t\t</dcsat:item>')
 
@@ -985,6 +1040,17 @@ def _emit_area_template_dsl(lines, t):
             lines.append(f'\t\t\t<dcsat:name>{esc_xml(str(tp["name"]))}</dcsat:name>')
             lines.append(f'\t\t\t<dcsat:expression>{esc_xml(str(tp["expression"]))}</dcsat:expression>')
             lines.append('\t\t</parameter>')
+            # Drilldown parameter
+            if tp.get('drilldown'):
+                dd_val = str(tp['drilldown'])
+                lines.append('\t\t<parameter xmlns:dcsat="http://v8.1c.ru/8.1/data-composition-system/area-template" xsi:type="dcsat:DetailsAreaTemplateParameter">')
+                lines.append(f'\t\t\t<dcsat:name>\u0420\u0430\u0441\u0448\u0438\u0444\u0440\u043e\u0432\u043a\u0430_{esc_xml(dd_val)}</dcsat:name>')
+                lines.append('\t\t\t<dcsat:fieldExpression>')
+                lines.append('\t\t\t\t<dcsat:field>\u0418\u043c\u044f\u0420\u0435\u0441\u0443\u0440\u0441\u0430</dcsat:field>')
+                lines.append(f'\t\t\t\t<dcsat:expression>"{esc_xml(dd_val)}"</dcsat:expression>')
+                lines.append('\t\t\t</dcsat:fieldExpression>')
+                lines.append('\t\t\t<dcsat:mainAction>DrillDown</dcsat:mainAction>')
+                lines.append('\t\t</parameter>')
     lines.append('\t</template>')
 
 
@@ -1007,6 +1073,17 @@ def emit_templates(lines, defn):
                     lines.append(f'\t\t\t<dcsat:name>{esc_xml(str(tp["name"]))}</dcsat:name>')
                     lines.append(f'\t\t\t<dcsat:expression>{esc_xml(str(tp["expression"]))}</dcsat:expression>')
                     lines.append('\t\t</parameter>')
+                    # Drilldown parameter
+                    if tp.get('drilldown'):
+                        dd_val = str(tp['drilldown'])
+                        lines.append('\t\t<parameter xmlns:dcsat="http://v8.1c.ru/8.1/data-composition-system/area-template" xsi:type="dcsat:DetailsAreaTemplateParameter">')
+                        lines.append(f'\t\t\t<dcsat:name>\u0420\u0430\u0441\u0448\u0438\u0444\u0440\u043e\u0432\u043a\u0430_{esc_xml(dd_val)}</dcsat:name>')
+                        lines.append('\t\t\t<dcsat:fieldExpression>')
+                        lines.append('\t\t\t\t<dcsat:field>\u0418\u043c\u044f\u0420\u0435\u0441\u0443\u0440\u0441\u0430</dcsat:field>')
+                        lines.append(f'\t\t\t\t<dcsat:expression>"{esc_xml(dd_val)}"</dcsat:expression>')
+                        lines.append('\t\t\t</dcsat:fieldExpression>')
+                        lines.append('\t\t\t<dcsat:mainAction>DrillDown</dcsat:mainAction>')
+                        lines.append('\t\t</parameter>')
             lines.append('\t</template>')
 
 
@@ -1016,11 +1093,19 @@ def emit_group_templates(lines, defn):
     if not defn.get('groupTemplates'):
         return
     for gt in defn['groupTemplates']:
-        lines.append('\t<groupTemplate>')
-        lines.append(f'\t\t<groupField>{esc_xml(str(gt["groupField"]))}</groupField>')
-        lines.append(f'\t\t<templateType>{esc_xml(str(gt["templateType"]))}</templateType>')
+        ttype = str(gt.get('templateType', '')) or 'Header'
+        is_header = (ttype == 'GroupHeader')
+        tag = 'groupHeaderTemplate' if is_header else 'groupTemplate'
+        xml_ttype = 'Header' if is_header else ttype
+
+        lines.append(f'\t<{tag}>')
+        if gt.get('groupName'):
+            lines.append(f'\t\t<groupName>{esc_xml(str(gt["groupName"]))}</groupName>')
+        elif gt.get('groupField'):
+            lines.append(f'\t\t<groupField>{esc_xml(str(gt["groupField"]))}</groupField>')
+        lines.append(f'\t\t<templateType>{esc_xml(xml_ttype)}</templateType>')
         lines.append(f'\t\t<template>{esc_xml(str(gt["template"]))}</template>')
-        lines.append('\t</groupTemplate>')
+        lines.append(f'\t</{tag}>')
 
 
 # === Settings Variants ===
@@ -1540,7 +1625,19 @@ def emit_settings_variants(lines, defn):
             emit_output_parameters(lines, s['outputParameters'], '\t\t\t')
 
         # DataParameters
-        if s.get('dataParameters'):
+        if s.get('dataParameters') == 'auto':
+            # Auto-generate dataParameters for all non-hidden params
+            auto_dp = []
+            for ap in _all_params:
+                if not ap['hidden']:
+                    auto_dp.append({
+                        'parameter': ap['name'],
+                        'use': False,
+                        'userSettingID': 'auto',
+                    })
+            if auto_dp:
+                emit_data_parameters(lines, auto_dp, '\t\t\t')
+        elif s.get('dataParameters'):
             emit_data_parameters(lines, s['dataParameters'], '\t\t\t')
 
         # Structure (supports string shorthand)

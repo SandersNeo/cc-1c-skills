@@ -1,4 +1,4 @@
-﻿# template-add v1.1 — Add template to 1C object
+﻿# template-add v1.2 — Add template to 1C object
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[Parameter(Mandatory)]
@@ -37,7 +37,7 @@ $tmpl = $typeMap[$TemplateType]
 
 $rootXmlPath = Join-Path $SrcDir "$ObjectName.xml"
 if (-not (Test-Path $rootXmlPath)) {
-	Write-Error "Корневой файл обработки не найден: $rootXmlPath"
+	Write-Error "Корневой файл объекта не найден: $rootXmlPath`nОжидается: <SrcDir>/<ObjectName>/<ObjectName>.xml`nПодсказка: SrcDir должен указывать на папку типа объектов (например Reports), а не на корень конфигурации"
 	exit 1
 }
 

@@ -97,7 +97,14 @@ powershell.exe -NoProfile -File .claude/skills/skd-compile/scripts/skd-compile.p
 ]
 ```
 
-`@autoDates` — автоматически генерирует параметры `ДатаНачала` и `ДатаОкончания` с выражениями `&Период.ДатаНачала` / `&Период.ДатаОкончания` и `availableAsField=false`. Заменяет 5 строк на 1.
+Флаги shorthand:
+- `@autoDates` — автоматически генерирует параметры `ДатаНачала` и `ДатаОкончания` с выражениями `&Период.ДатаНачала` / `&Период.ДатаОкончания` и `availableAsField=false`
+- `@valueList` — `<valueListAllowed>true</valueListAllowed>` — разрешает передавать список значений
+- `@hidden` — скрытый параметр: `availableAsField=false` + исключается из `"dataParameters": "auto"`
+
+Объектная форма: `hidden: true`, `valueListAllowed: true`, `availableAsField: false`.
+
+В варианте настроек `"dataParameters": "auto"` автоматически генерирует записи для всех не-hidden параметров с `userSettingID`.
 
 ### Фильтры — shorthand
 
@@ -235,14 +242,31 @@ powershell.exe -NoProfile -File .claude/skills/skd-compile/scripts/skd-compile.p
 
 Raw XML (`"template": "<...>"`) остаётся как fallback. Детект: если есть `rows` — DSL, иначе — raw.
 
+### Расшифровка (drilldown) в параметрах шаблона
+
+Ключ `drilldown` в параметре шаблона автоматически генерирует `DetailsAreaTemplateParameter` и привязку `Расшифровка` в appearance ячеек:
+
+```json
+"parameters": [
+  { "name": "Сырье", "expression": "ПоступлениеСырья", "drilldown": "ПоступлениеСырья" }
+]
+```
+
+Генерирует: `ExpressionAreaTemplateParameter` (обычный) + `DetailsAreaTemplateParameter` с именем `Расшифровка_ПоступлениеСырья`, `fieldExpression` по полю `ИмяРесурса`, `mainAction=DrillDown`. Ячейки `{Сырье}` автоматически получают appearance `Расшифровка = Расшифровка_ПоступлениеСырья`.
+
 ### Привязки макетов к группировкам
 
 ```json
 "groupTemplates": [
-  { "groupField": "Счет", "templateType": "GroupHeader", "template": "Макет1" },
-  { "groupField": "Счет", "templateType": "Header", "template": "Макет2" }
+  { "groupName": "ДанныеОтчета", "templateType": "GroupHeader", "template": "Макет1" },
+  { "groupField": "Счет", "templateType": "Header", "template": "Макет2" },
+  { "groupField": "Счет", "templateType": "OverallHeader", "template": "Макет3" }
 ]
 ```
+
+`groupField` — привязка к полю группировки, `groupName` — к именованной группировке в структуре варианта.
+
+`templateType`: `Header` (строки данных) → `<groupTemplate>`, `OverallHeader` (итоги) → `<groupTemplate>`, `GroupHeader` (шапка) → `<groupHeaderTemplate>`.
 
 ## Примеры
 

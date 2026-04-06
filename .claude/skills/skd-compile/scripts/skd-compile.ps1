@@ -1,4 +1,4 @@
-﻿# skd-compile v1.3 — Compile 1C DCS from JSON
+﻿# skd-compile v1.4 — Compile 1C DCS from JSON
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$DefinitionFile,
@@ -320,6 +320,18 @@ function Parse-ParamShorthand {
 	if ($s -match '@autoDates') {
 		$result.autoDates = $true
 		$s = $s -replace '\s*@autoDates', ''
+	}
+
+	# Extract @valueList flag
+	if ($s -match '@valueList') {
+		$result.valueListAllowed = $true
+		$s = $s -replace '\s*@valueList', ''
+	}
+
+	# Extract @hidden flag
+	if ($s -match '@hidden') {
+		$result.hidden = $true
+		$s = $s -replace '\s*@hidden', ''
 	}
 
 	# Split "Name: Type = Value"
@@ -746,8 +758,9 @@ function Emit-CalcFields {
 		if ($cf -is [string]) {
 			$parsed = Parse-CalcShorthand $cf
 		} else {
+			$dp = if ($cf.dataPath) { "$($cf.dataPath)" } else { "$($cf.field)" }
 			$parsed = @{
-				dataPath = "$($cf.dataPath)"
+				dataPath = $dp
 				expression = "$($cf.expression)"
 			}
 		}
@@ -854,9 +867,17 @@ function Emit-SingleParam {
 		X "`t`t<expression>$(Esc-Xml $parsed.expression)</expression>"
 	}
 
+	# Hidden implies availableAsField=false
+	if ($parsed.hidden -eq $true) { $parsed.availableAsField = $false }
+
 	# AvailableAsField
 	if ($parsed.availableAsField -eq $false) {
 		X "`t`t<availableAsField>false</availableAsField>"
+	}
+
+	# ValueListAllowed
+	if ($parsed.valueListAllowed -eq $true) {
+		X "`t`t<valueListAllowed>true</valueListAllowed>"
 	}
 
 	# Use
@@ -866,6 +887,8 @@ function Emit-SingleParam {
 
 	X "`t</parameter>"
 }
+
+$script:allParams = @()
 
 function Emit-Parameters {
 	if (-not $def.parameters) { return }
@@ -881,10 +904,15 @@ function Emit-Parameters {
 			}
 			if ($p.expression) { $parsed.expression = "$($p.expression)" }
 			if ($p.availableAsField -eq $false) { $parsed.availableAsField = $false }
+			if ($p.valueListAllowed -eq $true) { $parsed.valueListAllowed = $true }
+			if ($p.hidden -eq $true) { $parsed.hidden = $true }
 			if ($p.autoDates -eq $true) { $parsed.autoDates = $true }
 		}
 
 		Emit-SingleParam -p $p -parsed $parsed
+
+		# Track parameter for auto dataParameters
+		$script:allParams += @{ name = $parsed.name; hidden = [bool]$parsed.hidden; type = "$($parsed.type)"; value = $parsed.value }
 
 		# @autoDates: auto-generate ДатаНачала and ДатаОкончания
 		if ($parsed.autoDates) {
@@ -1005,7 +1033,7 @@ function Emit-ColorValue {
 }
 
 function Emit-CellAppearance {
-	param($style, [double]$width = 0, [bool]$vMerge = $false, [double]$minHeight = 0)
+	param($style, [double]$width = 0, [bool]$vMerge = $false, [double]$minHeight = 0, $extraItems = @())
 	$ind = "`t`t`t`t`t"
 	X "`t`t`t`t<dcsat:appearance>"
 	# Background color
@@ -1098,6 +1126,8 @@ function Emit-CellAppearance {
 		X "$ind`t<dcscor:value xsi:type=`"xs:boolean`">true</dcscor:value>"
 		X "$ind</dcscor:item>"
 	}
+	# Extra appearance items (e.g. drilldown Расшифровка)
+	foreach ($ei in $extraItems) { X $ei }
 	X "`t`t`t`t</dcsat:appearance>"
 }
 
@@ -1128,6 +1158,14 @@ function Emit-AreaTemplateDSL {
 	}
 	if (-not $vMerge.ContainsKey(0)) { $vMerge[0] = @{} }
 
+	# Build drilldown map: param_name -> drilldown_value
+	$drilldownMap = @{}
+	if ($t.parameters) {
+		foreach ($tp in $t.parameters) {
+			if ($tp.drilldown) { $drilldownMap["$($tp.name)"] = "$($tp.drilldown)" }
+		}
+	}
+
 	X "`t<template>"
 	X "`t`t<name>$(Esc-Xml "$($t.name)")</name>"
 	X "`t`t<template xmlns:dcsat=`"http://v8.1c.ru/8.1/data-composition-system/area-template`" xsi:type=`"dcsat:AreaTemplate`">"
@@ -1154,9 +1192,19 @@ function Emit-AreaTemplateDSL {
 					$cellStr = "$cellVal"
 					if ($cellStr -match '^\{(.+)\}$') {
 						# Parameter reference
+						$paramName = $Matches[1]
 						X "`t`t`t`t`t<dcsat:item xsi:type=`"dcsat:Field`">"
-						X "`t`t`t`t`t`t<dcsat:value xsi:type=`"dcscor:Parameter`">$(Esc-Xml $Matches[1])</dcsat:value>"
+						X "`t`t`t`t`t`t<dcsat:value xsi:type=`"dcscor:Parameter`">$(Esc-Xml $paramName)</dcsat:value>"
 						X "`t`t`t`t`t</dcsat:item>"
+						# Build drilldown appearance extra items
+						$cellExtraItems = @()
+						if ($drilldownMap.ContainsKey($paramName)) {
+							$ddVal = $drilldownMap[$paramName]
+							$cellExtraItems += "`t`t`t`t`t<dcscor:item>"
+							$cellExtraItems += "`t`t`t`t`t`t<dcscor:parameter>Расшифровка</dcscor:parameter>"
+							$cellExtraItems += "`t`t`t`t`t`t<dcscor:value xsi:type=`"dcscor:Parameter`">Расшифровка_$ddVal</dcscor:value>"
+							$cellExtraItems += "`t`t`t`t`t</dcscor:item>"
+						}
 					} else {
 						# Static text
 						X "`t`t`t`t`t<dcsat:item xsi:type=`"dcsat:Field`">"
@@ -1171,7 +1219,9 @@ function Emit-AreaTemplateDSL {
 				}
 				# Appearance
 				$h = if ($r -eq 0) { $minHeight } else { 0 }
-				Emit-CellAppearance $style $w $startsVMerge $h
+				if (-not $cellExtraItems) { $cellExtraItems = @() }
+				Emit-CellAppearance $style $w $startsVMerge $h $cellExtraItems
+				$cellExtraItems = @()
 			}
 			X "`t`t`t`t</dcsat:tableCell>"
 		}
@@ -1186,6 +1236,18 @@ function Emit-AreaTemplateDSL {
 			X "`t`t`t<dcsat:name>$(Esc-Xml "$($tp.name)")</dcsat:name>"
 			X "`t`t`t<dcsat:expression>$(Esc-Xml "$($tp.expression)")</dcsat:expression>"
 			X "`t`t</parameter>"
+			# Drilldown parameter
+			if ($tp.drilldown) {
+				$ddVal = "$($tp.drilldown)"
+				X "`t`t<parameter xmlns:dcsat=`"http://v8.1c.ru/8.1/data-composition-system/area-template`" xsi:type=`"dcsat:DetailsAreaTemplateParameter`">"
+				X "`t`t`t<dcsat:name>Расшифровка_$(Esc-Xml $ddVal)</dcsat:name>"
+				X "`t`t`t<dcsat:fieldExpression>"
+				X "`t`t`t`t<dcsat:field>ИмяРесурса</dcsat:field>"
+				X "`t`t`t`t<dcsat:expression>`"$(Esc-Xml $ddVal)`"</dcsat:expression>"
+				X "`t`t`t</dcsat:fieldExpression>"
+				X "`t`t`t<dcsat:mainAction>DrillDown</dcsat:mainAction>"
+				X "`t`t</parameter>"
+			}
 		}
 	}
 	X "`t</template>"
@@ -1211,6 +1273,18 @@ function Emit-Templates {
 					X "`t`t`t<dcsat:name>$(Esc-Xml "$($tp.name)")</dcsat:name>"
 					X "`t`t`t<dcsat:expression>$(Esc-Xml "$($tp.expression)")</dcsat:expression>"
 					X "`t`t</parameter>"
+					# Drilldown parameter
+					if ($tp.drilldown) {
+						$ddVal = "$($tp.drilldown)"
+						X "`t`t<parameter xmlns:dcsat=`"http://v8.1c.ru/8.1/data-composition-system/area-template`" xsi:type=`"dcsat:DetailsAreaTemplateParameter`">"
+						X "`t`t`t<dcsat:name>Расшифровка_$(Esc-Xml $ddVal)</dcsat:name>"
+						X "`t`t`t<dcsat:fieldExpression>"
+						X "`t`t`t`t<dcsat:field>ИмяРесурса</dcsat:field>"
+						X "`t`t`t`t<dcsat:expression>`"$(Esc-Xml $ddVal)`"</dcsat:expression>"
+						X "`t`t`t</dcsat:fieldExpression>"
+						X "`t`t`t<dcsat:mainAction>DrillDown</dcsat:mainAction>"
+						X "`t`t</parameter>"
+					}
 				}
 			}
 			X "`t</template>"
@@ -1222,11 +1296,20 @@ function Emit-Templates {
 function Emit-GroupTemplates {
 	if (-not $def.groupTemplates) { return }
 	foreach ($gt in $def.groupTemplates) {
-		X "`t<groupTemplate>"
-		X "`t`t<groupField>$(Esc-Xml "$($gt.groupField)")</groupField>"
-		X "`t`t<templateType>$(Esc-Xml "$($gt.templateType)")</templateType>"
+		$ttype = if ($gt.templateType) { "$($gt.templateType)" } else { "Header" }
+		$isHeader = ($ttype -eq 'GroupHeader')
+		$tag = if ($isHeader) { 'groupHeaderTemplate' } else { 'groupTemplate' }
+		$xmlTType = if ($isHeader) { 'Header' } else { $ttype }
+
+		X "`t<$tag>"
+		if ($gt.groupName) {
+			X "`t`t<groupName>$(Esc-Xml "$($gt.groupName)")</groupName>"
+		} elseif ($gt.groupField) {
+			X "`t`t<groupField>$(Esc-Xml "$($gt.groupField)")</groupField>"
+		}
+		X "`t`t<templateType>$(Esc-Xml $xmlTType)</templateType>"
 		X "`t`t<template>$(Esc-Xml "$($gt.template)")</template>"
-		X "`t</groupTemplate>"
+		X "`t</$tag>"
 	}
 }
 
@@ -1868,7 +1951,22 @@ function Emit-SettingsVariants {
 		}
 
 		# DataParameters
-		if ($s.dataParameters) {
+		if ($s.dataParameters -eq 'auto') {
+			# Auto-generate dataParameters for all non-hidden params
+			$autoDP = @()
+			foreach ($ap in $script:allParams) {
+				if (-not $ap.hidden) {
+					$dpItem = New-Object PSObject
+					$dpItem | Add-Member -NotePropertyName "parameter" -NotePropertyValue $ap.name
+					$dpItem | Add-Member -NotePropertyName "use" -NotePropertyValue $false
+					$dpItem | Add-Member -NotePropertyName "userSettingID" -NotePropertyValue "auto"
+					$autoDP += $dpItem
+				}
+			}
+			if ($autoDP.Count -gt 0) {
+				Emit-DataParameters -items $autoDP -indent "`t`t`t"
+			}
+		} elseif ($s.dataParameters) {
 			Emit-DataParameters -items $s.dataParameters -indent "`t`t`t"
 		}
 
