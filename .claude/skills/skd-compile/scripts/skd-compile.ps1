@@ -1,4 +1,4 @@
-﻿# skd-compile v1.7 — Compile 1C DCS from JSON
+﻿# skd-compile v1.8 — Compile 1C DCS from JSON
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$DefinitionFile,
@@ -1231,12 +1231,6 @@ function Emit-AreaTemplateDSL {
 			$w = if ($c -lt $widths.Count) { [double]$widths[$c] } else { 0 }
 			$isVMerged = $vMerge[$r][$c] -eq $true
 			$isHMerged = $hMerge[$r][$c] -eq $true
-			# Check if this cell starts a vertical merge (next row has "|" in same column)
-			$startsVMerge = $false
-			for ($nr = $r + 1; $nr -lt $rows.Count; $nr++) {
-				if ($vMerge[$nr][$c] -eq $true) { $startsVMerge = $true } else { break }
-			}
-
 			X "`t`t`t`t<dcsat:tableCell>"
 			if ($isVMerged) {
 				# Vertically merged cell — only appearance with vMerge flag + width
@@ -1281,7 +1275,7 @@ function Emit-AreaTemplateDSL {
 				# Appearance
 				$h = if ($r -eq 0) { $minHeight } else { 0 }
 				if (-not $cellExtraItems) { $cellExtraItems = @() }
-				Emit-CellAppearance $style $w $startsVMerge $false $h $cellExtraItems
+				Emit-CellAppearance $style $w $false $false $h $cellExtraItems
 				$cellExtraItems = @()
 			}
 			X "`t`t`t`t</dcsat:tableCell>"

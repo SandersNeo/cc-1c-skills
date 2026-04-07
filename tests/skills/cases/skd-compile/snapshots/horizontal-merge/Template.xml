@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+﻿<?xml version="1.0" encoding="UTF-8"?>
 <DataCompositionSchema xmlns="http://v8.1c.ru/8.1/data-composition-system/schema"
 		xmlns:dcscom="http://v8.1c.ru/8.1/data-composition-system/common"
 		xmlns:dcscor="http://v8.1c.ru/8.1/data-composition-system/core"
@@ -187,10 +187,6 @@
 						<dcscor:parameter>МинимальнаяВысота</dcscor:parameter>
 						<dcscor:value xsi:type="xs:decimal">24.75</dcscor:value>
 					</dcscor:item>
-					<dcscor:item>
-						<dcscor:parameter>ОбъединятьПоВертикали</dcscor:parameter>
-						<dcscor:value xsi:type="xs:boolean">true</dcscor:value>
-					</dcscor:item>
 				</dcsat:appearance>
 				</dcsat:tableCell>
 				<dcsat:tableCell>
@@ -264,10 +260,6 @@
 					<dcscor:item>
 						<dcscor:parameter>МинимальнаяВысота</dcscor:parameter>
 						<dcscor:value xsi:type="xs:decimal">24.75</dcscor:value>
-					</dcscor:item>
-					<dcscor:item>
-						<dcscor:parameter>ОбъединятьПоВертикали</dcscor:parameter>
-						<dcscor:value xsi:type="xs:boolean">true</dcscor:value>
 					</dcscor:item>
 				</dcsat:appearance>
 				</dcsat:tableCell>
@@ -688,10 +680,6 @@
 					<dcscor:item>
 						<dcscor:parameter>МинимальнаяВысота</dcscor:parameter>
 						<dcscor:value xsi:type="xs:decimal">24.75</dcscor:value>
-					</dcscor:item>
-					<dcscor:item>
-						<dcscor:parameter>ОбъединятьПоВертикали</dcscor:parameter>
-						<dcscor:value xsi:type="xs:boolean">true</dcscor:value>
 					</dcscor:item>
 				</dcsat:appearance>
 				</dcsat:tableCell>

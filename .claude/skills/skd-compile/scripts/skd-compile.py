@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# skd-compile v1.7 — Compile 1C DCS from JSON
+# skd-compile v1.8 — Compile 1C DCS from JSON
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import json
@@ -1041,14 +1041,6 @@ def _emit_area_template_dsl(lines, t):
             w = float(widths[c]) if c < len(widths) else 0
             is_v_merged = v_merge.get(r, {}).get(c, False)
             is_h_merged = h_merge.get(r, {}).get(c, False)
-            # Check if this cell starts a vertical merge
-            starts_v_merge = False
-            for nr in range(r + 1, len(rows)):
-                if v_merge.get(nr, {}).get(c, False):
-                    starts_v_merge = True
-                else:
-                    break
-
             lines.append('\t\t\t\t<dcsat:tableCell>')
             if is_v_merged:
                 _emit_cell_appearance(lines, style, w, True)
@@ -1086,7 +1078,7 @@ def _emit_area_template_dsl(lines, t):
                         lines.append('\t\t\t\t\t\t</dcsat:value>')
                         lines.append('\t\t\t\t\t</dcsat:item>')
                 h = min_height if r == 0 else 0
-                _emit_cell_appearance(lines, style, w, starts_v_merge, False, h, cell_extra_items or None)
+                _emit_cell_appearance(lines, style, w, False, False, h, cell_extra_items or None)
             lines.append('\t\t\t\t</dcsat:tableCell>')
         lines.append('\t\t\t</dcsat:item>')
 
