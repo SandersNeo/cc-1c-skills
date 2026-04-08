@@ -1,4 +1,4 @@
-# skd-edit v1.7 — Atomic 1C DCS editor (Python port)
+# skd-edit v1.8 — Atomic 1C DCS editor (Python port)
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import os
@@ -16,7 +16,7 @@ sys.stderr.reconfigure(encoding="utf-8")
 VALID_OPS = [
     "add-field", "add-total", "add-calculated-field", "add-parameter", "add-filter",
     "add-dataParameter", "add-order", "add-selection", "add-dataSetLink",
-    "add-dataSet", "add-variant", "add-conditionalAppearance",
+    "add-dataSet", "add-variant", "add-conditionalAppearance", "add-drilldown",
     "set-query", "patch-query", "set-outputParameter", "set-structure",
     "modify-field", "modify-filter", "modify-dataParameter", "modify-parameter",
     "clear-selection", "clear-order", "clear-filter",
@@ -1319,6 +1319,11 @@ if operation in ("set-query", "set-structure", "add-dataSet"):
     values = [value_arg]
 elif operation == "patch-query":
     values = [v for v in value_arg.split(";;") if v.strip()]
+elif operation == "add-drilldown":
+    if ";;" in value_arg:
+        values = [v.strip() for v in value_arg.split(";;") if v.strip()]
+    else:
+        values = [v.strip() for v in value_arg.split(",") if v.strip()]
 else:
     values = [v.strip() for v in value_arg.split(";;") if v.strip()]
 
@@ -2107,6 +2112,151 @@ elif operation == "remove-filter":
             continue
         remove_node_with_whitespace(filter_item)
         print(f'[OK] Filter for "{field_name}" removed from variant "{var_name}"')
+
+elif operation == "add-drilldown":
+    # String-based manipulation — templates use dcsat namespace with inline xmlns
+    with open(resolved_path, "r", encoding="utf-8-sig") as f:
+        raw_text = f.read()
+    nl = "\r\n"
+    dcsat_ns_decl = 'xmlns:dcsat="http://v8.1c.ru/8.1/data-composition-system/area-template"'
+
+    # Find all outer <template> blocks by nesting-aware scan
+    name_regex = re.compile(r'<template>\s*<name>([^<]+)</name>')
+    tpl_starts = [(m.start(), m.group(1)) for m in name_regex.finditer(raw_text)]
+
+    # For each start, find closing </template> at nesting depth 0
+    tpl_blocks = []
+    for ts_pos, ts_name in tpl_starts:
+        depth = 1
+        scan_pos = ts_pos + 10  # skip past opening <template>
+        while depth > 0 and scan_pos < len(raw_text):
+            next_open = raw_text.find("<template", scan_pos)
+            next_close = raw_text.find("</template>", scan_pos)
+            if next_close < 0:
+                break
+            if next_open >= 0 and next_open < next_close:
+                depth += 1
+                scan_pos = next_open + 10
+            else:
+                depth -= 1
+                if depth == 0:
+                    end_pos = next_close + len("</template>")
+                    tpl_blocks.append((ts_name, ts_pos, raw_text[ts_pos:end_pos]))
+                scan_pos = next_close + 11
+
+    if not tpl_blocks:
+        print("[WARN] No named templates found in schema")
+
+    # Collect all insertions as (position, text) — apply in reverse order
+    insertions = []
+
+    expr_regex = re.compile(
+        r'(?s)<parameter[^>]*ExpressionAreaTemplateParameter[^>]*>\s*'
+        r'<dcsat:name>([^<]+)</dcsat:name>\s*'
+        r'<dcsat:expression>([^<]+)</dcsat:expression>\s*</parameter>'
+    )
+
+    for tpl_name, tpl_start, tpl_text in tpl_blocks:
+
+        # Build map: expression → paramName from ExpressionAreaTemplateParameter
+        expr_map = {}
+        for em in expr_regex.finditer(tpl_text):
+            p_name = em.group(1)
+            p_expr = em.group(2)
+            expr_map[p_expr] = p_name
+
+        for resource in values:
+            drill_name = f"Расшифровка_{resource}"
+
+            # Idempotency: check if already exists
+            if drill_name in tpl_text:
+                print(f"[INFO] {drill_name} already exists in {tpl_name} — skipped")
+                continue
+
+            # Find ExpressionAreaTemplateParameter by expression
+            param_name = expr_map.get(resource)
+            if param_name is None:
+                print(f'[WARN] Expression "{resource}" not found in template {tpl_name} — skipped')
+                continue
+
+            cell_count = 0
+
+            # Step 1: Insert DetailsAreaTemplateParameter after last </parameter> in template
+            last_param_end_tag = "</parameter>"
+            last_param_pos = tpl_text.rfind(last_param_end_tag)
+            if last_param_pos >= 0:
+                insert_pos = tpl_start + last_param_pos + len(last_param_end_tag)
+                # Detect indent from context
+                prev_nl = tpl_text.rfind("\n", 0, last_param_pos)
+                indent = "\t\t"
+                if prev_nl >= 0:
+                    line_start = prev_nl + 1
+                    indent_match = re.match(r'^(\s*)', tpl_text[line_start:])
+                    if indent_match:
+                        indent = indent_match.group(1)
+                details_xml = (
+                    f'{nl}{indent}<parameter {dcsat_ns_decl} xsi:type="dcsat:DetailsAreaTemplateParameter">'
+                    f'{nl}{indent}\t<dcsat:name>{drill_name}</dcsat:name>'
+                    f'{nl}{indent}\t<dcsat:fieldExpression>'
+                    f'{nl}{indent}\t\t<dcsat:field>ИмяРесурса</dcsat:field>'
+                    f'{nl}{indent}\t\t<dcsat:expression>"{resource}"</dcsat:expression>'
+                    f'{nl}{indent}\t</dcsat:fieldExpression>'
+                    f'{nl}{indent}\t<dcsat:mainAction>DrillDown</dcsat:mainAction>'
+                    f'{nl}{indent}</parameter>'
+                )
+                insertions.append((insert_pos, details_xml))
+
+            # Step 2: Insert appearance binding in cells referencing this parameter
+            cell_tag = f'<dcsat:value xsi:type="dcscor:Parameter">{param_name}</dcsat:value>'
+            search_start = 0
+            while True:
+                cell_idx = tpl_text.find(cell_tag, search_start)
+                if cell_idx < 0:
+                    break
+                cell_end = tpl_text.find("</dcsat:tableCell>", cell_idx)
+                if cell_end < 0:
+                    break
+                app_end = tpl_text.rfind("</dcsat:appearance>", cell_idx, cell_end)
+                if app_end < cell_idx:
+                    search_start = cell_end + 1
+                    continue
+
+                # Detect indent for appearance items — insert after \n, before indent of </dcsat:appearance>
+                app_prev_nl = tpl_text.rfind("\n", 0, app_end)
+                app_indent = "\t\t\t\t\t\t"
+                if app_prev_nl >= 0:
+                    app_line_start = app_prev_nl + 1
+                    app_indent_match = re.match(r'^(\s*)', tpl_text[app_line_start:])
+                    if app_indent_match:
+                        app_indent = app_indent_match.group(1)
+                item_indent = app_indent + "\t"
+                appearance_xml = (
+                    f'{item_indent}<dcscor:item>{nl}'
+                    f'{item_indent}\t<dcscor:parameter>Расшифровка</dcscor:parameter>{nl}'
+                    f'{item_indent}\t<dcscor:value xsi:type="dcscor:Parameter">{drill_name}</dcscor:value>{nl}'
+                    f'{item_indent}</dcscor:item>{nl}'
+                )
+                # Insert after \n (before indent of closing tag), not before the tag itself
+                insert_at = (tpl_start + app_prev_nl + 1) if app_prev_nl >= 0 else (tpl_start + app_end)
+                insertions.append((insert_at, appearance_xml))
+                cell_count += 1
+                search_start = cell_end + 1
+
+            print(f"[OK] {drill_name} \u2192 {tpl_name} (param + {cell_count} cell(s))")
+
+    # Apply insertions in reverse order to preserve offsets.
+    # For same position: reverse insertion order so first resource ends up first in file.
+    insertions = [(pos, text, seq) for seq, (pos, text) in enumerate(insertions)]
+    insertions.sort(key=lambda x: (x[0], x[2]), reverse=True)
+    for pos, text, _seq in insertions:
+        raw_text = raw_text[:pos] + text + raw_text[pos:]
+
+    # Write directly — skip lxml save
+    with open(resolved_path, "wb") as f:
+        f.write(b'\xef\xbb\xbf')
+        f.write(raw_text.encode("utf-8"))
+    print(f"[OK] Saved {resolved_path}")
+    sys.exit(0)
 
 # ── 9. Save ─────────────────────────────────────────────────
 

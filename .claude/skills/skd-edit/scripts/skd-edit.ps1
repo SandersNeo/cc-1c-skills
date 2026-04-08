@@ -1,4 +1,4 @@
-﻿# skd-edit v1.7 — Atomic 1C DCS editor
+﻿# skd-edit v1.8 — Atomic 1C DCS editor
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[Parameter(Mandatory)]
@@ -8,7 +8,7 @@ param(
 	[ValidateSet(
 		"add-field","add-total","add-calculated-field","add-parameter","add-filter",
 		"add-dataParameter","add-order","add-selection","add-dataSetLink",
-		"add-dataSet","add-variant","add-conditionalAppearance",
+		"add-dataSet","add-variant","add-conditionalAppearance","add-drilldown",
 		"set-query","patch-query","set-outputParameter","set-structure",
 		"modify-field","modify-filter","modify-dataParameter","modify-parameter",
 		"clear-selection","clear-order","clear-filter",
@@ -1526,6 +1526,12 @@ if ($Operation -eq "set-query" -or $Operation -eq "set-structure" -or $Operation
 	$values = @($Value)
 } elseif ($Operation -eq "patch-query") {
 	$values = @($Value -split ';;' | Where-Object { $_.Trim() })
+} elseif ($Operation -eq "add-drilldown") {
+	if ($Value.Contains(';;')) {
+		$values = @($Value -split ';;' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+	} else {
+		$values = @($Value -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+	}
 } else {
 	$values = @($Value -split ';;' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
 }
@@ -2537,6 +2543,155 @@ switch ($Operation) {
 			Remove-NodeWithWhitespace $filterItem
 			Write-Host "[OK] Filter for `"$fieldName`" removed from variant `"$varName`""
 		}
+	}
+
+	"add-drilldown" {
+		# String-based manipulation — templates use dcsat namespace with inline xmlns
+		$rawText = [System.IO.File]::ReadAllText($resolvedPath, [System.Text.Encoding]::UTF8)
+		$nl = "`r`n"
+		$dcsatNsDecl = 'xmlns:dcsat="http://v8.1c.ru/8.1/data-composition-system/area-template"'
+
+		# Find all outer <template> blocks by nesting-aware scan
+		$tplStarts = [System.Collections.ArrayList]::new()
+		$nameRegex = [regex]'<template>\s*<name>([^<]+)</name>'
+		foreach ($m in $nameRegex.Matches($rawText)) {
+			[void]$tplStarts.Add(@{ pos = $m.Index; name = $m.Groups[1].Value })
+		}
+
+		# For each start, find closing </template> at nesting depth 0
+		$tplBlocks = [System.Collections.ArrayList]::new()
+		foreach ($ts in $tplStarts) {
+			$depth = 1
+			$scanPos = $ts.pos + 10  # skip past opening <template>
+			while ($depth -gt 0 -and $scanPos -lt $rawText.Length) {
+				$nextOpen = $rawText.IndexOf("<template", $scanPos)
+				$nextClose = $rawText.IndexOf("</template>", $scanPos)
+				if ($nextClose -lt 0) { break }
+				if ($nextOpen -ge 0 -and $nextOpen -lt $nextClose) {
+					$depth++
+					$scanPos = $nextOpen + 10
+				} else {
+					$depth--
+					if ($depth -eq 0) {
+						$endPos = $nextClose + "</template>".Length
+						[void]$tplBlocks.Add(@{ name = $ts.name; start = $ts.pos; text = $rawText.Substring($ts.pos, $endPos - $ts.pos) })
+					}
+					$scanPos = $nextClose + 11
+				}
+			}
+		}
+
+		if ($tplBlocks.Count -eq 0) {
+			Write-Host "[WARN] No named templates found in schema"
+		}
+
+		# Collect all insertions as (position, text) — apply in reverse order
+		$insertions = [System.Collections.ArrayList]::new()
+
+		foreach ($tplBlock in $tplBlocks) {
+			$tplName = $tplBlock.name
+			$tplText = $tplBlock.text
+			$tplStart = $tplBlock.start
+
+			# Build map: expression → paramName from ExpressionAreaTemplateParameter
+			$exprMap = @{}
+			$exprRegex = [regex]'(?s)<parameter[^>]*ExpressionAreaTemplateParameter[^>]*>\s*<dcsat:name>([^<]+)</dcsat:name>\s*<dcsat:expression>([^<]+)</dcsat:expression>\s*</parameter>'
+			foreach ($em in $exprRegex.Matches($tplText)) {
+				$pName = $em.Groups[1].Value
+				$pExpr = $em.Groups[2].Value
+				$exprMap[$pExpr] = $pName
+			}
+
+			foreach ($resource in $values) {
+				$drillName = "Расшифровка_$resource"
+
+				# Idempotency: check if already exists
+				if ($tplText.Contains($drillName)) {
+					Write-Host "[INFO] $drillName already exists in $tplName — skipped"
+					continue
+				}
+
+				# Find ExpressionAreaTemplateParameter by expression
+				$paramName = $null
+				if ($exprMap.ContainsKey($resource)) {
+					$paramName = $exprMap[$resource]
+				} else {
+					Write-Host "[WARN] Expression `"$resource`" not found in template $tplName — skipped"
+					continue
+				}
+
+				$cellCount = 0
+
+				# Step 1: Insert DetailsAreaTemplateParameter after last </parameter> in template
+				$lastParamEndTag = "</parameter>"
+				$lastParamPos = $tplText.LastIndexOf($lastParamEndTag)
+				if ($lastParamPos -ge 0) {
+					$insertPos = $tplStart + $lastParamPos + $lastParamEndTag.Length
+					# Detect indent from context
+					$prevNewline = $tplText.LastIndexOf("`n", $lastParamPos)
+					$indent = "`t`t"
+					if ($prevNewline -ge 0) {
+						$lineStart = $prevNewline + 1
+						$indentMatch = [regex]::Match($tplText.Substring($lineStart), '^(\s*)')
+						if ($indentMatch.Success) { $indent = $indentMatch.Groups[1].Value }
+					}
+					$detailsXml = "$nl$indent<parameter $dcsatNsDecl xsi:type=`"dcsat:DetailsAreaTemplateParameter`">" +
+						"$nl$indent`t<dcsat:name>$drillName</dcsat:name>" +
+						"$nl$indent`t<dcsat:fieldExpression>" +
+						"$nl$indent`t`t<dcsat:field>ИмяРесурса</dcsat:field>" +
+						"$nl$indent`t`t<dcsat:expression>`"$resource`"</dcsat:expression>" +
+						"$nl$indent`t</dcsat:fieldExpression>" +
+						"$nl$indent`t<dcsat:mainAction>DrillDown</dcsat:mainAction>" +
+						"$nl$indent</parameter>"
+					[void]$insertions.Add(@{ pos = $insertPos; text = $detailsXml })
+				}
+
+				# Step 2: Insert appearance binding in cells referencing this parameter
+				$cellTag = '<dcsat:value xsi:type="dcscor:Parameter">' + $paramName + '</dcsat:value>'
+				$searchStart = 0
+				while (($cellIdx = $tplText.IndexOf($cellTag, $searchStart)) -ge 0) {
+					$cellEnd = $tplText.IndexOf("</dcsat:tableCell>", $cellIdx)
+					if ($cellEnd -lt 0) { break }
+					$appEnd = $tplText.LastIndexOf("</dcsat:appearance>", $cellEnd)
+					if ($appEnd -lt $cellIdx) { $searchStart = $cellEnd + 1; continue }
+
+					# Detect indent for appearance items — insert after \n, before indent of </dcsat:appearance>
+					$appPrevNl = $tplText.LastIndexOf("`n", $appEnd)
+					$appIndent = "`t`t`t`t`t`t"
+					if ($appPrevNl -ge 0) {
+						$appLineStart = $appPrevNl + 1
+						$appIndentMatch = [regex]::Match($tplText.Substring($appLineStart), '^(\s*)')
+						if ($appIndentMatch.Success) { $appIndent = $appIndentMatch.Groups[1].Value }
+					}
+					$itemIndent = $appIndent + "`t"
+					$appearanceXml = "$itemIndent<dcscor:item>$nl" +
+						"$itemIndent`t<dcscor:parameter>Расшифровка</dcscor:parameter>$nl" +
+						"$itemIndent`t<dcscor:value xsi:type=`"dcscor:Parameter`">$drillName</dcscor:value>$nl" +
+						"$itemIndent</dcscor:item>$nl"
+					# Insert after \n (before indent of closing tag), not before the tag itself
+					$insertAt = if ($appPrevNl -ge 0) { $tplStart + $appPrevNl + 1 } else { $tplStart + $appEnd }
+					[void]$insertions.Add(@{ pos = $insertAt; text = $appearanceXml })
+					$cellCount++
+					$searchStart = $cellEnd + 1
+				}
+
+				Write-Host "[OK] $drillName → $tplName (param + $cellCount cell(s))"
+			}
+		}
+
+		# Apply insertions in reverse order to preserve offsets.
+		# For same position: reverse insertion order so first resource ends up first in file.
+		$idx = 0; foreach ($ins in $insertions) { $ins.seq = $idx; $idx++ }
+		$sorted = $insertions | Sort-Object { $_.pos }, { $_.seq } -Descending
+		foreach ($ins in $sorted) {
+			$rawText = $rawText.Insert($ins.pos, $ins.text)
+		}
+
+		# Write directly — skip DOM save
+		$enc = New-Object System.Text.UTF8Encoding($true)
+		[System.IO.File]::WriteAllText($resolvedPath, $rawText, $enc)
+		Write-Host "[OK] Saved $resolvedPath"
+		exit 0
 	}
 }
 
