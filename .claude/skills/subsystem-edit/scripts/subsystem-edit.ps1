@@ -1,4 +1,4 @@
-﻿# subsystem-edit v1.1 — Edit existing 1C subsystem XML
+﻿# subsystem-edit v1.2 — Edit existing 1C subsystem XML
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[Parameter(Mandatory)][string]$SubsystemPath,
@@ -119,11 +119,16 @@ if (-not (Test-Path $SubsystemPath)) {
 }
 if (-not (Test-Path $SubsystemPath)) { Write-Error "File not found: $SubsystemPath"; exit 1 }
 $resolvedPath = (Resolve-Path $SubsystemPath).Path
+$script:resolvedPath = $resolvedPath
 
 # --- Load XML with PreserveWhitespace ---
 $script:xmlDoc = New-Object System.Xml.XmlDocument
 $script:xmlDoc.PreserveWhitespace = $true
 $script:xmlDoc.Load($resolvedPath)
+
+$script:formatVersion = $script:xmlDoc.DocumentElement.GetAttribute("version")
+if (-not $script:formatVersion) { $script:formatVersion = "2.17" }
+$script:utf8Bom = New-Object System.Text.UTF8Encoding($true)
 
 $script:addCount = 0
 $script:removeCount = 0
@@ -164,6 +169,37 @@ foreach ($child in $script:propsEl.ChildNodes) {
 Info "Subsystem: $($script:objName)"
 
 # --- XML manipulation helpers (from meta-edit pattern) ---
+function Esc-Xml([string]$s) {
+	return $s.Replace('&','&amp;').Replace('<','&lt;').Replace('>','&gt;').Replace('"','&quot;')
+}
+
+function New-Guid-String {
+	return [System.Guid]::NewGuid().ToString()
+}
+
+function Write-ChildSubsystemStub([string]$childPath, [string]$childName, [string]$formatVersion, [System.Text.Encoding]$utf8Bom) {
+	$childUuid = New-Guid-String
+	$sb = New-Object System.Text.StringBuilder 2048
+	[void]$sb.AppendLine('<?xml version="1.0" encoding="UTF-8"?>')
+	[void]$sb.AppendLine("<MetaDataObject xmlns=`"http://v8.1c.ru/8.3/MDClasses`" xmlns:app=`"http://v8.1c.ru/8.2/managed-application/core`" xmlns:cfg=`"http://v8.1c.ru/8.1/data/enterprise/current-config`" xmlns:cmi=`"http://v8.1c.ru/8.2/managed-application/cmi`" xmlns:ent=`"http://v8.1c.ru/8.1/data/enterprise`" xmlns:lf=`"http://v8.1c.ru/8.2/managed-application/logform`" xmlns:style=`"http://v8.1c.ru/8.1/data/ui/style`" xmlns:sys=`"http://v8.1c.ru/8.1/data/ui/fonts/system`" xmlns:v8=`"http://v8.1c.ru/8.1/data/core`" xmlns:v8ui=`"http://v8.1c.ru/8.1/data/ui`" xmlns:web=`"http://v8.1c.ru/8.1/data/ui/colors/web`" xmlns:win=`"http://v8.1c.ru/8.1/data/ui/colors/windows`" xmlns:xen=`"http://v8.1c.ru/8.3/xcf/enums`" xmlns:xpr=`"http://v8.1c.ru/8.3/xcf/predef`" xmlns:xr=`"http://v8.1c.ru/8.3/xcf/readable`" xmlns:xs=`"http://www.w3.org/2001/XMLSchema`" xmlns:xsi=`"http://www.w3.org/2001/XMLSchema-instance`" version=`"$formatVersion`">")
+	[void]$sb.AppendLine("`t<Subsystem uuid=`"$childUuid`">")
+	[void]$sb.AppendLine("`t`t<Properties>")
+	[void]$sb.AppendLine("`t`t`t<Name>$(Esc-Xml $childName)</Name>")
+	[void]$sb.AppendLine("`t`t`t<Synonym/>")
+	[void]$sb.AppendLine("`t`t`t<Comment/>")
+	[void]$sb.AppendLine("`t`t`t<IncludeHelpInContents>true</IncludeHelpInContents>")
+	[void]$sb.AppendLine("`t`t`t<IncludeInCommandInterface>true</IncludeInCommandInterface>")
+	[void]$sb.AppendLine("`t`t`t<UseOneCommand>false</UseOneCommand>")
+	[void]$sb.AppendLine("`t`t`t<Explanation/>")
+	[void]$sb.AppendLine("`t`t`t<Picture/>")
+	[void]$sb.AppendLine("`t`t`t<Content/>")
+	[void]$sb.AppendLine("`t`t</Properties>")
+	[void]$sb.AppendLine("`t`t<ChildObjects/>")
+	[void]$sb.AppendLine("`t</Subsystem>")
+	[void]$sb.AppendLine('</MetaDataObject>')
+	[System.IO.File]::WriteAllText($childPath, $sb.ToString(), $utf8Bom)
+}
+
 function Import-Fragment([string]$xmlString) {
 	$wrapper = "<_W xmlns=`"$($script:mdNs)`" xmlns:xsi=`"$($script:xsiNs)`" xmlns:v8=`"$($script:v8Ns)`" xmlns:xr=`"$($script:xrNs)`" xmlns:xs=`"http://www.w3.org/2001/XMLSchema`">$xmlString</_W>"
 	$frag = New-Object System.Xml.XmlDocument
@@ -337,6 +373,20 @@ function Do-AddChild([string]$childName) {
 	Insert-BeforeElement $script:childObjsEl $newEl $null $childIndent
 	$script:addCount++
 	Info "Added child subsystem: $childName"
+
+	# Write stub XML for the new child if it doesn't exist yet
+	$parentDir = [System.IO.Path]::GetDirectoryName($script:resolvedPath)
+	$parentBaseName = [System.IO.Path]::GetFileNameWithoutExtension($script:resolvedPath)
+	$childSubsDir = Join-Path (Join-Path $parentDir $parentBaseName) "Subsystems"
+	if (-not (Test-Path $childSubsDir)) {
+		New-Item -ItemType Directory -Path $childSubsDir -Force | Out-Null
+		Info "Created directory: $childSubsDir"
+	}
+	$childXml = Join-Path $childSubsDir "$childName.xml"
+	if (-not (Test-Path $childXml)) {
+		Write-ChildSubsystemStub $childXml $childName $script:formatVersion $script:utf8Bom
+		Info "Created stub: $childXml"
+	}
 }
 
 function Do-RemoveChild([string]$childName) {
