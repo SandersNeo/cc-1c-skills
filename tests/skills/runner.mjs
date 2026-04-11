@@ -223,8 +223,16 @@ function buildArgs(skillConfig, caseData, workDir, inputFilePath, runtime) {
       case 'workPath':
         // workDir + value from case.params or case (specified in mapping.field)
         const wpField = mapping.field || 'objectPath';
-        const wpVal = caseData.params?.[wpField] ?? caseData[wpField] ?? '';
-        args.push(join(workDir, wpVal));
+        const wpVal = caseData.params?.[wpField] ?? caseData[wpField];
+        if (wpVal === undefined || wpVal === null || wpVal === '') {
+          if (mapping.optional) {
+            args.pop(); // remove the flag we pushed at the top of the loop
+            break;
+          }
+          args.push(join(workDir, ''));
+        } else {
+          args.push(join(workDir, wpVal));
+        }
         break;
       case 'switch':
         // flag already pushed, no value needed — remove the flag and re-push conditionally

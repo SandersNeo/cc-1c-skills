@@ -38,8 +38,7 @@ powershell.exe -NoProfile -File '.claude/skills/subsystem-compile/scripts/subsys
   "useOneCommand": false,
   "explanation": "Описание раздела",
   "picture": "CommonPicture.МояКартинка",
-  "content": ["Catalog.Товары", "Document.Заказ"],
-  "children": ["ДочерняяА", "ДочерняяБ"]
+  "content": ["Catalog.Товары", "Document.Заказ"]
 }
 ```
 

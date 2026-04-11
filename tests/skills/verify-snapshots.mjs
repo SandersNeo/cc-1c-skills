@@ -250,8 +250,16 @@ function buildSkillArgs(skillConfig, caseData, workDir, inputFile, runtime) {
         break;
       case 'workPath': {
         const field = mapping.field || 'objectPath';
-        const val = caseData.params?.[field] ?? caseData[field] ?? '';
-        args.push(join(workDir, val));
+        const val = caseData.params?.[field] ?? caseData[field];
+        if (val === undefined || val === null || val === '') {
+          if (mapping.optional) {
+            args.pop(); // remove flag pushed above
+            break;
+          }
+          args.push(join(workDir, ''));
+        } else {
+          args.push(join(workDir, val));
+        }
         break;
       }
       case 'switch':
