@@ -520,7 +520,7 @@ async function verifyCase(skillName, caseName, skillConfig, caseData, opts) {
 
       try {
         execSkill(opts.runtime, 'db-load-xml/scripts/db-load-xml',
-          ['-V8Path', opts.v8ctx.v8path, '-InfoBasePath', dbDir, '-ConfigDir', baseConfigDir], 180_000);
+          ['-V8Path', opts.v8ctx.v8path, '-InfoBasePath', dbDir, '-ConfigDir', baseConfigDir, '-StrictLog'], 180_000);
         log('db-load-xml (config)', true);
       } catch (e) {
         const detail = (e.stderr || e.stdout || e.message).trim();
@@ -551,7 +551,7 @@ async function verifyCase(skillName, caseName, skillConfig, caseData, opts) {
       if (existsSync(extDir)) {
         try {
           execSkill(opts.runtime, 'db-load-xml/scripts/db-load-xml',
-            ['-V8Path', opts.v8ctx.v8path, '-InfoBasePath', dbDir, '-ConfigDir', extDir, '-Extension', extName], 180_000);
+            ['-V8Path', opts.v8ctx.v8path, '-InfoBasePath', dbDir, '-ConfigDir', extDir, '-Extension', extName, '-StrictLog'], 180_000);
           log('db-load-xml (ext)', true);
         } catch (e) {
           const detail = (e.stderr || e.stdout || e.message).trim();
@@ -624,7 +624,7 @@ async function verifyCase(skillName, caseName, skillConfig, caseData, opts) {
 
     try {
       execSkill(opts.runtime, 'db-load-xml/scripts/db-load-xml',
-        ['-V8Path', opts.v8ctx.v8path, '-InfoBasePath', dbDir, '-ConfigDir', configDir], 180_000);
+        ['-V8Path', opts.v8ctx.v8path, '-InfoBasePath', dbDir, '-ConfigDir', configDir, '-StrictLog'], 180_000);
       log('db-load-xml', true);
     } catch (e) {
       const detail = (e.stderr || e.stdout || e.message).trim();
