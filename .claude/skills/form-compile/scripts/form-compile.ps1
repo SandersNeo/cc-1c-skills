@@ -268,6 +268,16 @@ function Load-Preset([string]$PresetName, [string]$ScriptDir) {
 }
 
 # --- Helper: build a field element DSL entry ---
+# Non-displayable types — cannot be bound to form elements
+$script:nonDisplayableTypes = @('v8:ValueStorage', 'ValueStorage', 'ХранилищеЗначения')
+
+function Test-DisplayableType([string]$typeStr) {
+	foreach ($nd in $script:nonDisplayableTypes) {
+		if ($typeStr -match [regex]::Escape($nd)) { return $false }
+	}
+	return $true
+}
+
 function New-FieldElement {
 	param([string]$attrName, [string]$dataPath, [string]$attrType, [hashtable]$fieldDefaults, [hashtable]$extraProps)
 
@@ -352,6 +362,7 @@ function Generate-CatalogListDSL($meta, [hashtable]$p) {
 	}
 	# Custom attributes
 	foreach ($attr in $meta.Attributes) {
+		if (-not (Test-DisplayableType $attr.Type)) { continue }
 		$columns += [ordered]@{ labelField = $attr.Name; path = "Список.$($attr.Name)" }
 	}
 	# Hidden ref
@@ -467,6 +478,7 @@ function Generate-CatalogItemDSL($meta, [hashtable]$p, [hashtable]$fd) {
 
 	foreach ($attr in $meta.Attributes) {
 		if ($footerFieldNames -contains $attr.Name) { continue }
+		if (-not (Test-DisplayableType $attr.Type)) { continue }
 		$headerChildren += (New-FieldElement -attrName $attr.Name -dataPath "Объект.$($attr.Name)" -attrType $attr.Type -fieldDefaults $fd -extraProps @{})
 	}
 
@@ -555,6 +567,7 @@ function Generate-DocumentListDSL($meta, [hashtable]$p) {
 	$columns = @()
 	# All custom attributes as labelField
 	foreach ($attr in $meta.Attributes) {
+		if (-not (Test-DisplayableType $attr.Type)) { continue }
 		$columns += [ordered]@{ labelField = $attr.Name; path = "Список.$($attr.Name)" }
 	}
 	# Hidden ref
@@ -629,7 +642,7 @@ function Generate-DocumentItemDSL($meta, [hashtable]$p, [hashtable]$fd) {
 
 	$unclaimed = @()
 	foreach ($attr in $meta.Attributes) {
-		if (-not $claimed.ContainsKey($attr.Name)) { $unclaimed += $attr }
+		if (-not $claimed.ContainsKey($attr.Name) -and (Test-DisplayableType $attr.Type)) { $unclaimed += $attr }
 	}
 
 	# Distribute unclaimed
@@ -698,7 +711,7 @@ function Generate-DocumentItemDSL($meta, [hashtable]$p, [hashtable]$fd) {
 	$footerElements = @()
 	foreach ($fn in $footerFields) {
 		$fAttr = $meta.Attributes | Where-Object { $_.Name -eq $fn }
-		if ($fAttr) {
+		if ($fAttr -and (Test-DisplayableType $fAttr.Type)) {
 			$footerElements += (New-FieldElement -attrName $fAttr.Name -dataPath "Объект.$($fAttr.Name)" -attrType $fAttr.Type -fieldDefaults $fd -extraProps @{})
 		}
 	}

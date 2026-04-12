@@ -255,6 +255,12 @@ def load_preset(preset_name, script_dir, out_path_resolved):
     return defaults
 
 
+# Non-displayable types — cannot be bound to form elements
+NON_DISPLAYABLE_TYPES = ('ValueStorage', 'v8:ValueStorage', 'ХранилищеЗначения')
+
+def is_displayable_type(type_str):
+    return not any(nd in type_str for nd in NON_DISPLAYABLE_TYPES)
+
 def new_field_element(attr_name, data_path, attr_type, field_defaults, extra_props=None):
     """Build a field element DSL entry."""
     is_ref = bool(re.search(r'Ref\.', attr_type))
@@ -339,6 +345,8 @@ def generate_catalog_list_dsl(meta, p):
         columns.append(OrderedDict([('labelField', '\u041a\u043e\u0434'), ('path', '\u0421\u043f\u0438\u0441\u043e\u043a.Code')]))
     # Custom attributes
     for attr in meta['Attributes']:
+        if not is_displayable_type(attr['Type']):
+            continue
         columns.append(OrderedDict([('labelField', attr['Name']), ('path', f"\u0421\u043f\u0438\u0441\u043e\u043a.{attr['Name']}")]))
     # Hidden ref
     if p.get('hiddenRef', True) is not False:
@@ -444,6 +452,8 @@ def generate_catalog_item_dsl(meta, p, fd):
     for attr in meta['Attributes']:
         if attr['Name'] in footer_field_names:
             continue
+        if not is_displayable_type(attr['Type']):
+            continue
         header_children.append(new_field_element(attr['Name'], f"\u041e\u0431\u044a\u0435\u043a\u0442.{attr['Name']}", attr['Type'], fd))
 
     # Build root elements
@@ -520,6 +530,8 @@ def generate_document_list_dsl(meta, p):
     columns = []
     # All custom attributes as labelField
     for attr in meta['Attributes']:
+        if not is_displayable_type(attr['Type']):
+            continue
         columns.append(OrderedDict([('labelField', attr['Name']), ('path', f"\u0421\u043f\u0438\u0441\u043e\u043a.{attr['Name']}")]))
     # Hidden ref
     if p.get('hiddenRef', True):
@@ -596,7 +608,7 @@ def generate_document_item_dsl(meta, p, fd):
     for fn in add_right:
         claimed[fn] = 'additional.right'
 
-    unclaimed = [attr for attr in meta['Attributes'] if attr['Name'] not in claimed]
+    unclaimed = [attr for attr in meta['Attributes'] if attr['Name'] not in claimed and is_displayable_type(attr['Type'])]
 
     # Distribute unclaimed
     left_attrs = []
