@@ -1,4 +1,4 @@
-# skd-edit v1.10 — Atomic 1C DCS editor (Python port)
+# skd-edit v1.11 — Atomic 1C DCS editor (Python port)
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import os
@@ -260,26 +260,42 @@ def parse_total_shorthand(s):
 
 
 def parse_calc_shorthand(s):
-    title = ""
-    m = re.search(r'\[([^\]]+)\]', s)
-    if m:
-        title = m.group(1)
-        s = re.sub(r'\s*\[[^\]]+\]', '', s)
+    # Pattern: "Name [Title]: type = Expression #noField #noFilter ...".
+    # - `[Title]` is extracted only from the LHS of '=' so that `[...]` inside
+    #   an expression (e.g. index access) isn't interpreted as a title.
+    # - `#restrict` flags use a known-names pattern and are extracted globally —
+    #   the docs put them after `=`, and the closed flag set avoids matching
+    #   `#word` that happens to appear inside a string literal.
+    restrict_pattern = r'#(noField|noFilter|noCondition|noGroup|noOrder)\b'
 
-    restrict_matches = re.findall(r'#(\w+)', s)
-    s = re.sub(r'\s*#\w+', '', s)
+    restrict_matches = re.findall(restrict_pattern, s)
+    s = re.sub(r'\s*' + restrict_pattern, '', s)
 
     eq_idx = s.find("=")
     if eq_idx > 0:
-        left = s[:eq_idx].strip()
-        expression = s[eq_idx + 1:].strip()
-        if ":" in left:
-            colon_idx = left.index(":")
-            data_path = left[:colon_idx].strip()
-            type_str = resolve_type_str(left[colon_idx + 1:].strip())
-            return {"dataPath": data_path, "expression": expression, "type": type_str, "title": title, "restrict": restrict_matches}
-        return {"dataPath": left, "expression": expression, "type": "", "title": title, "restrict": restrict_matches}
-    return {"dataPath": s.strip(), "expression": "", "type": "", "title": title, "restrict": restrict_matches}
+        lhs = s[:eq_idx]
+        rhs = s[eq_idx + 1:].strip()
+        has_rhs = True
+    else:
+        lhs = s
+        rhs = ""
+        has_rhs = False
+
+    title = ""
+    m = re.search(r'\[([^\]]+)\]', lhs)
+    if m:
+        title = m.group(1)
+        lhs = re.sub(r'\s*\[[^\]]+\]', '', lhs)
+    lhs = lhs.strip()
+
+    if has_rhs:
+        if ":" in lhs:
+            colon_idx = lhs.index(":")
+            data_path = lhs[:colon_idx].strip()
+            type_str = resolve_type_str(lhs[colon_idx + 1:].strip())
+            return {"dataPath": data_path, "expression": rhs, "type": type_str, "title": title, "restrict": restrict_matches}
+        return {"dataPath": lhs, "expression": rhs, "type": "", "title": title, "restrict": restrict_matches}
+    return {"dataPath": lhs, "expression": "", "type": "", "title": title, "restrict": restrict_matches}
 
 
 def parse_param_shorthand(s):

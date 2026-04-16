@@ -85,6 +85,23 @@ powershell.exe -NoProfile -File .claude/skills/skd-compile/scripts/skd-compile.p
 
 В объектной форме: `"useRestriction": { "field": true, "condition": true, "group": true, "order": true }` или `"restrict": ["noField", "noFilter"]`.
 
+### Вычисляемые поля (calculatedFields)
+
+Shorthand: `"Имя [Заголовок]: тип = Выражение #noField #noFilter #noGroup #noOrder"` — все части кроме имени опциональны.
+
+```json
+"calculatedFields": [
+  "Маржа = Цена - Закупка",
+  "Наценка [Наценка, %]: decimal(10,2) = Маржа / Закупка * 100",
+  "Служебное: string = \"\" #noField #noFilter #noGroup #noOrder"
+]
+```
+
+Объектная форма — когда нужна `appearance`:
+```json
+{ "name": "Маржа", "title": "Маржа", "expression": "Цена - Закупка", "type": "decimal(15,2)", "useRestriction": "#noField #noFilter" }
+```
+
 ### Итоги (shorthand)
 
 ```json

@@ -1,4 +1,4 @@
-﻿# skd-edit v1.10 — Atomic 1C DCS editor
+﻿# skd-edit v1.11 — Atomic 1C DCS editor
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[Parameter(Mandatory)]
@@ -251,36 +251,46 @@ function Parse-TotalShorthand {
 function Parse-CalcShorthand {
 	param([string]$s)
 
-	$title = ""
-	# Extract [Title] first
-	if ($s -match '\[([^\]]+)\]') {
-		$title = $Matches[1]
-		$s = $s -replace '\s*\[[^\]]+\]', ''
-	}
+	# Pattern: "Name [Title]: type = Expression #noField #noFilter ...".
+	# - `[Title]` is extracted only from the LHS of '=' so that `[...]` inside
+	#   an expression (e.g. index access) isn't interpreted as a title.
+	# - `#restrict` flags use a known-names pattern and are extracted globally —
+	#   the docs put them after `=`, and the closed flag set avoids matching
+	#   `#word` that happens to appear inside a string literal.
+	$restrictPattern = '#(noField|noFilter|noCondition|noGroup|noOrder)\b'
 
-	# Extract #restrictions
 	$restrict = @()
-	$restrictMatches = [regex]::Matches($s, '#(\w+)')
-	foreach ($m in $restrictMatches) {
+	foreach ($m in [regex]::Matches($s, $restrictPattern)) {
 		$restrict += $m.Groups[1].Value
 	}
-	$s = [regex]::Replace($s, '\s*#\w+', '')
+	$s = [regex]::Replace($s, "\s*$restrictPattern", '')
 
-	# Support "Name: Type = Expression" and "Name = Expression"
 	$eqIdx = $s.IndexOf('=')
 	if ($eqIdx -gt 0) {
-		$left = $s.Substring(0, $eqIdx).Trim()
-		$expression = $s.Substring($eqIdx + 1).Trim()
-
-		if ($left.Contains(':')) {
-			$colonIdx = $left.IndexOf(':')
-			$dataPath = $left.Substring(0, $colonIdx).Trim()
-			$type = Resolve-TypeStr ($left.Substring($colonIdx + 1).Trim())
-			return @{ dataPath = $dataPath; expression = $expression; type = $type; title = $title; restrict = $restrict }
-		}
-		return @{ dataPath = $left; expression = $expression; type = ""; title = $title; restrict = $restrict }
+		$lhs = $s.Substring(0, $eqIdx)
+		$rhs = $s.Substring($eqIdx + 1).Trim()
+	} else {
+		$lhs = $s
+		$rhs = $null
 	}
-	return @{ dataPath = $s.Trim(); expression = ""; type = ""; title = $title; restrict = $restrict }
+
+	$title = ""
+	if ($lhs -match '\[([^\]]+)\]') {
+		$title = $Matches[1]
+		$lhs = $lhs -replace '\s*\[[^\]]+\]', ''
+	}
+	$lhs = $lhs.Trim()
+
+	if ($null -ne $rhs) {
+		if ($lhs.Contains(':')) {
+			$colonIdx = $lhs.IndexOf(':')
+			$dataPath = $lhs.Substring(0, $colonIdx).Trim()
+			$type = Resolve-TypeStr ($lhs.Substring($colonIdx + 1).Trim())
+			return @{ dataPath = $dataPath; expression = $rhs; type = $type; title = $title; restrict = $restrict }
+		}
+		return @{ dataPath = $lhs; expression = $rhs; type = ""; title = $title; restrict = $restrict }
+	}
+	return @{ dataPath = $lhs; expression = ""; type = ""; title = $title; restrict = $restrict }
 }
 
 function Parse-ParamShorthand {

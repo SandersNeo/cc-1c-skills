@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# skd-compile v1.12 — Compile 1C DCS from JSON
+# skd-compile v1.13 — Compile 1C DCS from JSON
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import json
@@ -277,13 +277,46 @@ def parse_param_shorthand(s):
 # --- Calculated field shorthand parser ---
 
 def parse_calc_shorthand(s):
-    idx = s.find('=')
-    if idx > 0:
-        return {
-            'dataPath': s[:idx].strip(),
-            'expression': s[idx + 1:].strip(),
-        }
-    return {'dataPath': s.strip(), 'expression': ''}
+    # Pattern: "Name [Title]: type = Expression #noField #noFilter ...".
+    # - `[Title]` is extracted only from the LHS of '=' so that `[...]` inside
+    #   an expression (e.g. index access) isn't interpreted as a title.
+    # - `#restrict` flags use a known-names pattern and are extracted globally —
+    #   the docs put them after `=`, and the closed flag set avoids matching
+    #   `#word` that happens to appear inside a string literal.
+    restrict_pattern = r'#(noField|noFilter|noCondition|noGroup|noOrder)\b'
+
+    restrict = re.findall(restrict_pattern, s)
+    s = re.sub(r'\s*' + restrict_pattern, '', s)
+
+    eq_idx = s.find('=')
+    if eq_idx > 0:
+        lhs = s[:eq_idx]
+        rhs = s[eq_idx + 1:].strip()
+    else:
+        lhs = s
+        rhs = ''
+
+    title = ''
+    m = re.search(r'\[([^\]]+)\]', lhs)
+    if m:
+        title = m.group(1)
+        lhs = re.sub(r'\s*\[[^\]]+\]', '', lhs)
+    lhs = lhs.strip()
+
+    type_str = ''
+    data_path = lhs
+    if ':' in lhs:
+        colon_idx = lhs.index(':')
+        data_path = lhs[:colon_idx].strip()
+        type_str = resolve_type_str(lhs[colon_idx + 1:].strip())
+
+    return {
+        'dataPath': data_path,
+        'expression': rhs,
+        'type': type_str,
+        'title': title,
+        'restrict': restrict,
+    }
 
 
 # --- DataParameter shorthand parser ---
@@ -623,56 +656,81 @@ def emit_data_set_links(lines, defn):
 def emit_calc_fields(lines, defn):
     if not defn.get('calculatedFields'):
         return
+    restrict_map = {
+        'noField': 'field', 'noFilter': 'condition', 'noCondition': 'condition',
+        'noGroup': 'group', 'noOrder': 'order',
+    }
     for cf in defn['calculatedFields']:
+        # Collect dataPath/expression/title/type/restrict/appearance from either
+        # shorthand string or object form. Object form accepts dataPath/field/name
+        # as synonyms; useRestriction/restrict accepts object, array, or flag string.
+        title = ''
+        type_str = ''
+        restrict_tokens = []
+        restrict_obj = None
+        appearance = None
+
         if isinstance(cf, str):
             parsed = parse_calc_shorthand(cf)
-            is_obj = False
+            data_path = parsed['dataPath']
+            expression = parsed['expression']
+            title = parsed.get('title', '') or ''
+            type_str = parsed.get('type', '') or ''
+            restrict_tokens = list(parsed.get('restrict') or [])
         else:
-            parsed = {
-                'dataPath': str(cf.get('dataPath') or cf.get('field', '')),
-                'expression': str(cf.get('expression', '')),
-            }
-            is_obj = True
-
-        lines.append('\t<calculatedField>')
-        lines.append(f'\t\t<dataPath>{esc_xml(parsed["dataPath"])}</dataPath>')
-        lines.append(f'\t\t<expression>{esc_xml(parsed["expression"])}</expression>')
-
-        if is_obj:
+            data_path = str(cf.get('dataPath') or cf.get('field') or cf.get('name') or '')
+            expression = str(cf.get('expression', ''))
             if cf.get('title'):
-                emit_mltext(lines, '\t\t', 'title', str(cf['title']))
+                title = str(cf['title'])
             if cf.get('type'):
-                cf_type = resolve_type_str(str(cf['type']))
-                lines.append('\t\t<valueType>')
-                emit_value_type(lines, cf_type, '\t\t\t')
-                lines.append('\t\t</valueType>')
-            restrict_val = cf.get('restrict') or cf.get('useRestriction')
+                type_str = resolve_type_str(str(cf['type']))
+
+            restrict_val = cf.get('restrict') if cf.get('restrict') is not None else cf.get('useRestriction')
             if restrict_val:
-                lines.append('\t\t<useRestriction>')
                 if isinstance(restrict_val, dict):
-                    # Object form: { "field": true, "condition": true, ... }
-                    for xml_name, flag in restrict_val.items():
-                        if flag:
-                            lines.append(f'\t\t\t<{esc_xml(str(xml_name))}>true</{esc_xml(str(xml_name))}>')
+                    restrict_obj = restrict_val
+                elif isinstance(restrict_val, str):
+                    # Flag-string form: "#noField #noFilter #noGroup #noOrder" (or without `#`)
+                    for tok in restrict_val.split():
+                        t = tok.strip().lstrip('#')
+                        if t:
+                            restrict_tokens.append(t)
                 else:
                     # Array form: ["noField", "noFilter", ...]
-                    restrict_map = {
-                        'noField': 'field', 'noFilter': 'condition', 'noCondition': 'condition',
-                        'noGroup': 'group', 'noOrder': 'order',
-                    }
                     for r in restrict_val:
-                        xml_name = restrict_map.get(str(r))
-                        if xml_name:
-                            lines.append(f'\t\t\t<{xml_name}>true</{xml_name}>')
-                lines.append('\t\t</useRestriction>')
-            if cf.get('appearance'):
-                lines.append('\t\t<appearance>')
-                for k, v in cf['appearance'].items():
-                    lines.append('\t\t\t<dcscor:item xsi:type="dcsset:SettingsParameterValue">')
-                    lines.append(f'\t\t\t\t<dcscor:parameter>{esc_xml(k)}</dcscor:parameter>')
-                    lines.append(f'\t\t\t\t<dcscor:value xsi:type="xs:string">{esc_xml(str(v))}</dcscor:value>')
-                    lines.append('\t\t\t</dcscor:item>')
-                lines.append('\t\t</appearance>')
+                        restrict_tokens.append(str(r))
+            appearance = cf.get('appearance')
+
+        lines.append('\t<calculatedField>')
+        lines.append(f'\t\t<dataPath>{esc_xml(data_path)}</dataPath>')
+        lines.append(f'\t\t<expression>{esc_xml(expression)}</expression>')
+
+        if title:
+            emit_mltext(lines, '\t\t', 'title', title)
+        if type_str:
+            lines.append('\t\t<valueType>')
+            emit_value_type(lines, type_str, '\t\t\t')
+            lines.append('\t\t</valueType>')
+        if restrict_obj or restrict_tokens:
+            lines.append('\t\t<useRestriction>')
+            if restrict_obj:
+                for xml_name, flag in restrict_obj.items():
+                    if flag:
+                        lines.append(f'\t\t\t<{esc_xml(str(xml_name))}>true</{esc_xml(str(xml_name))}>')
+            else:
+                for r in restrict_tokens:
+                    xml_name = restrict_map.get(str(r))
+                    if xml_name:
+                        lines.append(f'\t\t\t<{xml_name}>true</{xml_name}>')
+            lines.append('\t\t</useRestriction>')
+        if appearance:
+            lines.append('\t\t<appearance>')
+            for k, v in appearance.items():
+                lines.append('\t\t\t<dcscor:item xsi:type="dcsset:SettingsParameterValue">')
+                lines.append(f'\t\t\t\t<dcscor:parameter>{esc_xml(k)}</dcscor:parameter>')
+                lines.append(f'\t\t\t\t<dcscor:value xsi:type="xs:string">{esc_xml(str(v))}</dcscor:value>')
+                lines.append('\t\t\t</dcscor:item>')
+            lines.append('\t\t</appearance>')
 
         lines.append('\t</calculatedField>')
 

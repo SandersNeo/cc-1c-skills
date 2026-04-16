@@ -1,4 +1,4 @@
-﻿# skd-compile v1.12 — Compile 1C DCS from JSON
+﻿# skd-compile v1.13 — Compile 1C DCS from JSON
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$DefinitionFile,
@@ -367,15 +367,51 @@ function Parse-ParamShorthand {
 function Parse-CalcShorthand {
 	param([string]$s)
 
-	# "DataPath = Expression"
-	$idx = $s.IndexOf('=')
-	if ($idx -gt 0) {
-		return @{
-			dataPath = $s.Substring(0, $idx).Trim()
-			expression = $s.Substring($idx + 1).Trim()
-		}
+	# Pattern: "Name [Title]: type = Expression #noField #noFilter ...".
+	# - `[Title]` is extracted only from the LHS of '=' so that `[...]` inside
+	#   an expression (e.g. index access) isn't interpreted as a title.
+	# - `#restrict` flags use a known-names pattern and are extracted globally —
+	#   the docs put them after `=`, and the closed flag set avoids matching
+	#   `#word` that happens to appear inside a string literal.
+	$restrictPattern = '#(noField|noFilter|noCondition|noGroup|noOrder)\b'
+
+	$restrict = @()
+	foreach ($m in [regex]::Matches($s, $restrictPattern)) {
+		$restrict += $m.Groups[1].Value
 	}
-	return @{ dataPath = $s.Trim(); expression = "" }
+	$s = [regex]::Replace($s, "\s*$restrictPattern", '')
+
+	$eqIdx = $s.IndexOf('=')
+	if ($eqIdx -gt 0) {
+		$lhs = $s.Substring(0, $eqIdx)
+		$rhs = $s.Substring($eqIdx + 1).Trim()
+	} else {
+		$lhs = $s
+		$rhs = ""
+	}
+
+	$title = ""
+	if ($lhs -match '\[([^\]]+)\]') {
+		$title = $Matches[1]
+		$lhs = $lhs -replace '\s*\[[^\]]+\]', ''
+	}
+	$lhs = $lhs.Trim()
+
+	$type = ""
+	$dataPath = $lhs
+	if ($lhs.Contains(':')) {
+		$parts = $lhs -split ':', 2
+		$dataPath = $parts[0].Trim()
+		$type = Resolve-TypeStr ($parts[1].Trim())
+	}
+
+	return @{
+		dataPath = $dataPath
+		expression = $rhs
+		type = $type
+		title = $title
+		restrict = $restrict
+	}
 }
 
 # --- 8b. DataParameter shorthand parser ---
@@ -771,64 +807,90 @@ function Emit-DataSetLinks {
 # === CalculatedFields ===
 function Emit-CalcFields {
 	if (-not $def.calculatedFields) { return }
+	$restrictMap = @{
+		"noField" = "field"; "noFilter" = "condition"; "noCondition" = "condition"
+		"noGroup" = "group"; "noOrder" = "order"
+	}
 	foreach ($cf in $def.calculatedFields) {
+		# Collect dataPath/expression/title/type/restrict/appearance from either
+		# shorthand string or object form. Object form accepts dataPath/field/name
+		# as synonyms; useRestriction/restrict accepts object, array, or flag string.
+		$title = ""
+		$typeStr = ""
+		$restrictTokens = @()
+		$restrictObj = $null
+		$appearance = $null
+
 		if ($cf -is [string]) {
 			$parsed = Parse-CalcShorthand $cf
+			$dataPath = "$($parsed.dataPath)"
+			$expression = "$($parsed.expression)"
+			$title = "$($parsed.title)"
+			$typeStr = "$($parsed.type)"
+			if ($parsed.restrict) { $restrictTokens = @($parsed.restrict) }
 		} else {
-			$dp = if ($cf.dataPath) { "$($cf.dataPath)" } else { "$($cf.field)" }
-			$parsed = @{
-				dataPath = $dp
-				expression = "$($cf.expression)"
-			}
-		}
+			$dataPath = if ($cf.dataPath) { "$($cf.dataPath)" }
+				elseif ($cf.field) { "$($cf.field)" }
+				else { "$($cf.name)" }
+			$expression = "$($cf.expression)"
+			if ($cf.title) { $title = "$($cf.title)" }
+			if ($cf.type) { $typeStr = Resolve-TypeStr "$($cf.type)" }
 
-		X "`t<calculatedField>"
-		X "`t`t<dataPath>$(Esc-Xml $parsed.dataPath)</dataPath>"
-		X "`t`t<expression>$(Esc-Xml $parsed.expression)</expression>"
-
-		if ($cf -isnot [string]) {
-			if ($cf.title) {
-				Emit-MLText -tag "title" -text "$($cf.title)" -indent "`t`t"
-			}
-			if ($cf.type) {
-				$cfType = Resolve-TypeStr "$($cf.type)"
-				X "`t`t<valueType>"
-				Emit-ValueType -typeStr $cfType -indent "`t`t`t"
-				X "`t`t</valueType>"
-			}
 			$restrictVal = if ($cf.restrict) { $cf.restrict } elseif ($cf.useRestriction) { $cf.useRestriction } else { $null }
 			if ($restrictVal) {
-				X "`t`t<useRestriction>"
 				if ($restrictVal -is [System.Management.Automation.PSCustomObject] -or $restrictVal -is [hashtable]) {
-					# Object form: { "field": true, "condition": true, ... }
-					foreach ($prop in $restrictVal.PSObject.Properties) {
-						if ($prop.Value -eq $true) {
-							X "`t`t`t<$($prop.Name)>true</$($prop.Name)>"
-						}
+					$restrictObj = $restrictVal
+				} elseif ($restrictVal -is [string]) {
+					# Flag-string form: "#noField #noFilter #noGroup #noOrder" (or without `#`)
+					foreach ($tok in ($restrictVal -split '\s+')) {
+						$t = $tok.Trim().TrimStart('#')
+						if ($t) { $restrictTokens += $t }
 					}
 				} else {
 					# Array form: ["noField", "noFilter", ...]
-					$restrictMap = @{
-						"noField" = "field"; "noFilter" = "condition"; "noCondition" = "condition"
-						"noGroup" = "group"; "noOrder" = "order"
-					}
-					foreach ($r in $restrictVal) {
-						$xmlName = $restrictMap["$r"]
-						if ($xmlName) { X "`t`t`t<$xmlName>true</$xmlName>" }
+					foreach ($r in $restrictVal) { $restrictTokens += "$r" }
+				}
+			}
+			if ($cf.appearance) { $appearance = $cf.appearance }
+		}
+
+		X "`t<calculatedField>"
+		X "`t`t<dataPath>$(Esc-Xml $dataPath)</dataPath>"
+		X "`t`t<expression>$(Esc-Xml $expression)</expression>"
+
+		if ($title) {
+			Emit-MLText -tag "title" -text $title -indent "`t`t"
+		}
+		if ($typeStr) {
+			X "`t`t<valueType>"
+			Emit-ValueType -typeStr $typeStr -indent "`t`t`t"
+			X "`t`t</valueType>"
+		}
+		if ($restrictObj -or $restrictTokens.Count -gt 0) {
+			X "`t`t<useRestriction>"
+			if ($restrictObj) {
+				foreach ($prop in $restrictObj.PSObject.Properties) {
+					if ($prop.Value -eq $true) {
+						X "`t`t`t<$($prop.Name)>true</$($prop.Name)>"
 					}
 				}
-				X "`t`t</useRestriction>"
-			}
-			if ($cf.appearance) {
-				X "`t`t<appearance>"
-				foreach ($prop in $cf.appearance.PSObject.Properties) {
-					X "`t`t`t<dcscor:item xsi:type=`"dcsset:SettingsParameterValue`">"
-					X "`t`t`t`t<dcscor:parameter>$(Esc-Xml $prop.Name)</dcscor:parameter>"
-					X "`t`t`t`t<dcscor:value xsi:type=`"xs:string`">$(Esc-Xml "$($prop.Value)")</dcscor:value>"
-					X "`t`t`t</dcscor:item>"
+			} else {
+				foreach ($r in $restrictTokens) {
+					$xmlName = $restrictMap["$r"]
+					if ($xmlName) { X "`t`t`t<$xmlName>true</$xmlName>" }
 				}
-				X "`t`t</appearance>"
 			}
+			X "`t`t</useRestriction>"
+		}
+		if ($appearance) {
+			X "`t`t<appearance>"
+			foreach ($prop in $appearance.PSObject.Properties) {
+				X "`t`t`t<dcscor:item xsi:type=`"dcsset:SettingsParameterValue`">"
+				X "`t`t`t`t<dcscor:parameter>$(Esc-Xml $prop.Name)</dcscor:parameter>"
+				X "`t`t`t`t<dcscor:value xsi:type=`"xs:string`">$(Esc-Xml "$($prop.Value)")</dcscor:value>"
+				X "`t`t`t</dcscor:item>"
+			}
+			X "`t`t</appearance>"
 		}
 
 		X "`t</calculatedField>"
