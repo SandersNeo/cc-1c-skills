@@ -1,4 +1,4 @@
-// web-test dom v1.5 — DOM selectors and semantic mapping for 1C web client
+// web-test dom v1.6 — DOM selectors and semantic mapping for 1C web client
 // Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 /**
  * DOM selectors and semantic mapping for 1C:Enterprise web client.
@@ -10,9 +10,19 @@
 
 // --- Shared function strings (embedded in evaluate scripts) ---
 
+/** Find visible #modalSurface. 1C may leave multiple #modalSurface in DOM (duplicate id),
+ *  e.g. when a second form (drill-down) creates its own alongside a stale one from the first
+ *  form. getElementById returns the FIRST in document order, which may be hidden. Scan all. */
+const HAS_VISIBLE_MODAL_FN = `function hasVisibleModal() {
+  const all = document.querySelectorAll('#modalSurface');
+  for (const el of all) { if (el.offsetWidth > 0) return true; }
+  return false;
+}`;
+
 /** Detect active form number. Picks form with most visible elements, skipping form0.
  *  When modalSurface is visible — prefer the highest-numbered form (modal dialog). */
-const DETECT_FORM_FN = `function detectForm() {
+const DETECT_FORM_FN = HAS_VISIBLE_MODAL_FN + `
+function detectForm() {
   const counts = {};
   document.querySelectorAll('input.editInput[id], textarea[id], a.press[id]').forEach(el => {
     if (el.offsetWidth === 0) return;
@@ -24,8 +34,7 @@ const DETECT_FORM_FN = `function detectForm() {
   const candidates = nums.filter(n => n > 0);
   if (!candidates.length) return nums[0];
   // When modal surface is visible, prefer the highest-numbered form (modal dialog)
-  const modal = document.getElementById('modalSurface');
-  if (modal && modal.offsetWidth > 0) {
+  if (hasVisibleModal()) {
     const maxForm = Math.max(...candidates);
     if (counts[maxForm] >= 1) return maxForm;
   }
@@ -34,7 +43,8 @@ const DETECT_FORM_FN = `function detectForm() {
 
 /** Detect all open forms + modal state. Returns { activeForm, allForms, formCount, modal }.
  *  Works even when the open-windows tab bar is hidden. */
-const DETECT_FORMS_FN = `function detectForms() {
+const DETECT_FORMS_FN = HAS_VISIBLE_MODAL_FN + `
+function detectForms() {
   const counts = {};
   document.querySelectorAll('input.editInput[id], textarea[id], a.press[id]').forEach(el => {
     if (el.offsetWidth === 0) return;
@@ -42,9 +52,7 @@ const DETECT_FORMS_FN = `function detectForms() {
     if (m) counts[m[1]] = (counts[m[1]] || 0) + 1;
   });
   const nums = Object.keys(counts).map(Number);
-  const modal = document.getElementById('modalSurface');
-  const isModal = !!(modal && modal.offsetWidth > 0);
-  return { allForms: nums.sort((a, b) => a - b), formCount: nums.length, modal: isModal };
+  return { allForms: nums.sort((a, b) => a - b), formCount: nums.length, modal: hasVisibleModal() };
 }`;
 
 /** Read form state given prefix p. Returns { fields, buttons, tabs, texts, hyperlinks, table, iframes }. */
