@@ -1,4 +1,4 @@
-﻿# skd-compile v1.14 — Compile 1C DCS from JSON
+﻿# skd-compile v1.15 — Compile 1C DCS from JSON
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$DefinitionFile,
@@ -2170,6 +2170,21 @@ function Emit-SettingsVariants {
 					$dpItem | Add-Member -NotePropertyName "parameter" -NotePropertyValue $ap.name
 					$dpItem | Add-Member -NotePropertyName "use" -NotePropertyValue $false
 					$dpItem | Add-Member -NotePropertyName "userSettingID" -NotePropertyValue "auto"
+					# For StandardPeriod emit <dcscor:value> with variant inherited from
+					# the parameter default (Custom if none) — matches how 1C Designer
+					# persists SettingsParameterValue for period parameters.
+					if ($ap.type -eq 'StandardPeriod') {
+						$variant = 'Custom'
+						$av = $ap.value
+						if ($null -ne $av) {
+							if (($av -is [PSCustomObject] -or $av -is [hashtable]) -and $av.variant) {
+								$variant = "$($av.variant)"
+							} elseif ("$av") {
+								$variant = "$av"
+							}
+						}
+						$dpItem | Add-Member -NotePropertyName "value" -NotePropertyValue @{ variant = $variant }
+					}
 					$autoDP += $dpItem
 				}
 			}

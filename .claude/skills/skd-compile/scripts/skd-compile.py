@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# skd-compile v1.14 — Compile 1C DCS from JSON
+# skd-compile v1.15 — Compile 1C DCS from JSON
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import json
@@ -1819,11 +1819,24 @@ def emit_settings_variants(lines, defn):
             auto_dp = []
             for ap in _all_params:
                 if not ap['hidden']:
-                    auto_dp.append({
+                    item = {
                         'parameter': ap['name'],
                         'use': False,
                         'userSettingID': 'auto',
-                    })
+                    }
+                    # For StandardPeriod emit <dcscor:value> with variant inherited
+                    # from the parameter default (Custom if none) — matches how
+                    # 1C Designer persists SettingsParameterValue for period params.
+                    if ap.get('type') == 'StandardPeriod':
+                        variant = 'Custom'
+                        av = ap.get('value')
+                        if av is not None:
+                            if isinstance(av, dict) and av.get('variant'):
+                                variant = str(av['variant'])
+                            elif str(av):
+                                variant = str(av)
+                        item['value'] = {'variant': variant}
+                    auto_dp.append(item)
             if auto_dp:
                 emit_data_parameters(lines, auto_dp, '\t\t\t')
         elif s.get('dataParameters'):
