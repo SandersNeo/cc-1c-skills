@@ -1,4 +1,4 @@
-﻿# skd-compile v1.15 — Compile 1C DCS from JSON
+﻿# skd-compile v1.16 — Compile 1C DCS from JSON
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$DefinitionFile,
@@ -1044,18 +1044,18 @@ function Emit-Parameters {
 		# Track parameter for auto dataParameters
 		$script:allParams += @{ name = $parsed.name; hidden = [bool]$parsed.hidden; type = "$($parsed.type)"; value = $parsed.value }
 
-		# @autoDates: auto-generate ДатаНачала and ДатаОкончания (canonical БСП pattern)
+		# @autoDates: auto-generate НачалоПериода and КонецПериода (canonical БСП pattern)
 		if ($parsed.autoDates) {
 			$paramName = $parsed.name
 			$beginParsed = @{
-				name = "ДатаНачала"; title = "Начало периода"
+				name = "НачалоПериода"; title = "Начало периода"
 				type = "date"; value = "0001-01-01T00:00:00"
 				useRestriction = $true
 				expression = "&$paramName.ДатаНачала"
 			}
 			Emit-SingleParam -p $null -parsed $beginParsed
 			$endParsed = @{
-				name = "ДатаОкончания"; title = "Конец периода"
+				name = "КонецПериода"; title = "Конец периода"
 				type = "date"; value = "0001-01-01T00:00:00"
 				useRestriction = $true
 				expression = "&$paramName.ДатаОкончания"

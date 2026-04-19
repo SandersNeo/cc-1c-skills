@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# skd-compile v1.15 — Compile 1C DCS from JSON
+# skd-compile v1.16 — Compile 1C DCS from JSON
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import json
@@ -916,11 +916,11 @@ def emit_parameters(lines, defn):
             'value': parsed.get('value'),
         })
 
-        # @autoDates: auto-generate ДатаНачала and ДатаОкончания (canonical БСП pattern)
+        # @autoDates: auto-generate НачалоПериода and КонецПериода (canonical БСП pattern)
         if parsed.get('autoDates'):
             param_name = parsed['name']
             begin_parsed = {
-                'name': '\u0414\u0430\u0442\u0430\u041d\u0430\u0447\u0430\u043b\u0430',
+                'name': '\u041d\u0430\u0447\u0430\u043b\u043e\u041f\u0435\u0440\u0438\u043e\u0434\u0430',
                 'title': '\u041d\u0430\u0447\u0430\u043b\u043e \u043f\u0435\u0440\u0438\u043e\u0434\u0430',
                 'type': 'date', 'value': '0001-01-01T00:00:00',
                 'useRestriction': True,
@@ -928,7 +928,7 @@ def emit_parameters(lines, defn):
             }
             emit_single_param(lines, None, begin_parsed)
             end_parsed = {
-                'name': '\u0414\u0430\u0442\u0430\u041e\u043a\u043e\u043d\u0447\u0430\u043d\u0438\u044f',
+                'name': '\u041a\u043e\u043d\u0435\u0446\u041f\u0435\u0440\u0438\u043e\u0434\u0430',
                 'title': '\u041a\u043e\u043d\u0435\u0446 \u043f\u0435\u0440\u0438\u043e\u0434\u0430',
                 'type': 'date', 'value': '0001-01-01T00:00:00',
                 'useRestriction': True,

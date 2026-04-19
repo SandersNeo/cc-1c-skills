@@ -70,7 +70,7 @@
 		</value>
 	</parameter>
 	<parameter>
-		<name>ДатаНачала</name>
+		<name>НачалоПериода</name>
 		<title xsi:type="v8:LocalStringType">
 			<v8:item>
 				<v8:lang>ru</v8:lang>
@@ -88,7 +88,7 @@
 		<expression>&amp;Период.ДатаНачала</expression>
 	</parameter>
 	<parameter>
-		<name>ДатаОкончания</name>
+		<name>КонецПериода</name>
 		<title xsi:type="v8:LocalStringType">
 			<v8:item>
 				<v8:lang>ru</v8:lang>
