@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# skd-info v1.2 — Analyze 1C DCS structure
+# skd-info v1.3 — Analyze 1C DCS structure
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 
 import argparse
@@ -453,7 +453,10 @@ def main():
             grp_count = len(group_tpls) + len(group_header_tpls) + len(group_footer_tpls)
             if grp_count > 0:
                 parts.append(f"{grp_count} group")
-            lines.append(f"Templates: {len(tpl_defs)} defined ({', '.join(parts)} bindings)")
+            if parts:
+                lines.append(f"Templates: {len(tpl_defs)} defined ({', '.join(parts)} bindings)")
+            else:
+                lines.append(f"Templates: {len(tpl_defs)} defined")
 
         # Parameters -- split visible/hidden
         params = root.findall("s:parameter", NSMAP)

@@ -1,4 +1,4 @@
-﻿# skd-info v1.2 — Analyze 1C DCS structure
+﻿# skd-info v1.3 — Analyze 1C DCS structure
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[Parameter(Mandatory=$true)]
@@ -446,7 +446,11 @@ function Show-Overview {
 		if ($fieldTpls.Count -gt 0) { $parts += "$($fieldTpls.Count) field" }
 		$grpCount = $groupTpls.Count + $groupHeaderTpls.Count + $groupFooterTpls.Count
 		if ($grpCount -gt 0) { $parts += "$grpCount group" }
-		$lines.Add("Templates: $($tplDefs.Count) defined ($($parts -join ', ') bindings)")
+		if ($parts.Count -gt 0) {
+			$lines.Add("Templates: $($tplDefs.Count) defined ($($parts -join ', ') bindings)")
+		} else {
+			$lines.Add("Templates: $($tplDefs.Count) defined")
+		}
 	}
 
 	# Parameters — split visible/hidden
