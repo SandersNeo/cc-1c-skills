@@ -144,7 +144,6 @@ python scripts/switch.py --runtime powershell  # вернуть на PowerShell
 ```
 .claude/skills/          # Навыки Claude Code
 ├── epf-init/            # Создание обработки
-├── epf-add-form/        # Добавление формы к обработке
 ├── epf-build/           # Сборка EPF
 ├── epf-dump/            # Разборка EPF
 ├── epf-bsp-init/        # Регистрация БСП

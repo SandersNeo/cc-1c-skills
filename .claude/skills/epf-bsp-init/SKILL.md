@@ -203,6 +203,6 @@ allowed-tools:
 ## Дальнейшие шаги
 
 - Добавить ещё команду: `/epf-bsp-add-command`
-- Добавить форму: `/epf-add-form`
+- Добавить форму: `/form-add`
 - Добавить макет: `/template-add`
 - Собрать EPF: `/epf-build`

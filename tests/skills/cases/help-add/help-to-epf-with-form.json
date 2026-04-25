@@ -6,8 +6,8 @@
       "args": { "-Name": "ОбработкаСФормой", "-SrcDir": "{workDir}" }
     },
     {
-      "script": "epf-add-form/scripts/add-form",
-      "args": { "-ProcessorName": "ОбработкаСФормой", "-FormName": "Форма", "-SrcDir": "{workDir}" }
+      "script": "form-add/scripts/form-add",
+      "args": { "-ObjectPath": "{workDir}/ОбработкаСФормой.xml", "-FormName": "Форма" }
     }
   ],
   "params": { "objectName": "ОбработкаСФормой" }

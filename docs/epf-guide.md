@@ -7,7 +7,6 @@
 | Навык | Параметры | Описание |
 |-------|-----------|----------|
 | `/epf-init` | `<Name> [Synonym]` | Создать новую обработку (корневой XML + модуль объекта) |
-| `/epf-add-form` | `<ProcessorName> <FormName> [Synonym]` | Добавить управляемую форму к обработке |
 | `/epf-build` | `<ProcessorName>` | Собрать EPF из XML (через 1cv8.exe) |
 | `/epf-dump` | `<EpfFile>` | Разобрать EPF в XML (через 1cv8.exe) |
 | `/epf-bsp-init` | `<ProcessorName> <Вид>` | Добавить регистрацию БСП (СведенияОВнешнейОбработке) |
@@ -52,7 +51,7 @@
 > Создай обработку ЗагрузкаПрайса с формой
 ```
 
-Claude выполнит `/epf-init` и `/epf-add-form` с правильными параметрами.
+Claude выполнит `/epf-init` и `/form-add` с правильными параметрами.
 
 ### Внешняя печатная форма
 
@@ -98,7 +97,7 @@ Claude вызовет `/epf-build` или `/erf-build` в зависимости
 
 ```
 > /epf-init МояОбработка "Моя обработка"
-> /epf-add-form МояОбработка Форма
+> /form-add МояОбработка.xml Форма
 > /template-add МояОбработка Макет HTML
 > /help-add МояОбработка
 > /epf-build МояОбработка
@@ -120,7 +119,7 @@ src/
         └── ObjectModule.bsl                  # Модуль объекта
 ```
 
-После `/epf-add-form` и `/template-add`:
+После `/form-add` и `/template-add`:
 
 ```
 src/

@@ -35,7 +35,7 @@ powershell.exe -NoProfile -File .claude/skills/epf-init/scripts/init.ps1 -Name "
 
 ## Дальнейшие шаги
 
-- Добавить форму: `/epf-add-form`
+- Добавить форму: `/form-add`
 - Добавить макет: `/template-add`
 - Добавить справку: `/help-add`
 - Собрать EPF: `/epf-build`

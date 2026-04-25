@@ -4,7 +4,7 @@
 // Usage: node tests/skills/verify-snapshots.mjs [--skill meta-compile] [--case catalog-basic] [--runtime powershell|python] [--keep] [--verbose]
 // Supports: meta-compile, form-compile, form-add, form-edit, skd-compile, skd-edit,
 //           role-compile, subsystem-compile, subsystem-edit, mxl-compile, template-add,
-//           help-add, cf-init, cf-edit, epf-init, epf-add-form, meta-edit, interface-edit,
+//           help-add, cf-init, cf-edit, epf-init, meta-edit, interface-edit,
 //           cfe-init, cfe-borrow, cfe-patch-method
 
 import { execFileSync } from 'child_process';
@@ -322,7 +322,7 @@ const STANDALONE_SKILLS = new Set([
 
 // EPF/ERF skills — need epf-build to verify, not LoadConfigFromFiles
 const EPF_SKILLS = new Set([
-  'epf-init', 'epf-add-form', 'erf-init', 'template-add', 'help-add',
+  'epf-init', 'erf-init', 'template-add', 'help-add',
 ]);
 
 // CFE skills — two-stage load: base config → extension
@@ -703,7 +703,7 @@ const DEFAULT_SKILLS = [
   'meta-compile', 'form-compile', 'form-compile-from-object', 'form-add', 'form-edit',
   'role-compile', 'subsystem-compile', 'subsystem-edit',
   'cf-init', 'cf-edit', 'meta-edit', 'interface-edit',
-  'epf-init', 'epf-add-form', 'template-add', 'help-add',
+  'epf-init', 'template-add', 'help-add',
   'cfe-init', 'cfe-borrow', 'cfe-patch-method',
   'skd-compile', 'skd-edit', 'mxl-compile',
 ];

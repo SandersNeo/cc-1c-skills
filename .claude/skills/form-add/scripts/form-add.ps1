@@ -1,4 +1,4 @@
-﻿# form-add v1.3 — Add managed form to 1C config object
+﻿# form-add v1.4 — Add managed form to 1C config object
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[Parameter(Mandatory)]
@@ -219,9 +219,6 @@ if ($Purpose -eq "List" -or $Purpose -eq "Choice") {
 	<AutoCommandBar name="ФормаКоманднаяПанель" id="-1">
 		<Autofill>true</Autofill>
 	</AutoCommandBar>
-	<Events>
-		<Event name="OnCreateAtServer">ПриСозданииНаСервере</Event>
-	</Events>
 	<ChildItems/>
 	<Attributes>
 		<Attribute name="Список" id="1">
@@ -247,9 +244,6 @@ if ($Purpose -eq "List" -or $Purpose -eq "Choice") {
 	<AutoCommandBar name="ФормаКоманднаяПанель" id="-1">
 		<Autofill>true</Autofill>
 	</AutoCommandBar>
-	<Events>
-		<Event name="OnCreateAtServer">ПриСозданииНаСервере</Event>
-	</Events>
 	<ChildItems/>
 	<Attributes>
 		<Attribute name="$mainAttrName" id="1">
@@ -285,23 +279,25 @@ if ($Purpose -eq "List" -or $Purpose -eq "Choice") {
 
 	$mainAttrType = "$($attrTypeMap[$objectType]).$objectName"
 
+	# SavedData: standard for Catalog/Document/etc, but not for processor-like (DataProcessor/Report/External*)
+	$savedDataLine = ""
+	if ($objectType -notin $processorLikeTypes) {
+		$savedDataLine = "`n`t`t`t<SavedData>true</SavedData>"
+	}
+
 	$formXml = @"
 <?xml version="1.0" encoding="UTF-8"?>
 <Form $formNsDecl version="$($script:formatVersion)">
 	<AutoCommandBar name="ФормаКоманднаяПанель" id="-1">
 		<Autofill>true</Autofill>
 	</AutoCommandBar>
-	<Events>
-		<Event name="OnCreateAtServer">ПриСозданииНаСервере</Event>
-	</Events>
 	<ChildItems/>
 	<Attributes>
 		<Attribute name="$mainAttrName" id="1">
 			<Type>
 				<v8:Type>cfg:$mainAttrType</v8:Type>
 			</Type>
-			<MainAttribute>true</MainAttribute>
-			<SavedData>true</SavedData>
+			<MainAttribute>true</MainAttribute>$savedDataLine
 		</Attribute>
 	</Attributes>
 </Form>
@@ -320,11 +316,6 @@ $modulePath = Join-Path $formModuleDir "Module.bsl"
 
 $moduleBsl = @"
 #Область ОбработчикиСобытийФормы
-
-&НаСервере
-Процедура ПриСозданииНаСервере(Отказ, СтандартнаяОбработка)
-
-КонецПроцедуры
 
 #КонецОбласти
 
