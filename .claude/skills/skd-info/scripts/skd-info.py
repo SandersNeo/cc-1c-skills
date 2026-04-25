@@ -1665,7 +1665,11 @@ def main():
         if root.findall(".//s:dataSet[@xsi:type='DataSetQuery']", NSMAP):
             show_query()
         else:
-            lines.append("(no query datasets)")
+            obj_names = [n.text for n in root.findall(".//s:dataSet[@xsi:type='DataSetObject']/s:objectName", NSMAP) if n.text]
+            if obj_names:
+                lines.append(f"(no query datasets; external datasets: {', '.join(obj_names)})")
+            else:
+                lines.append("(no query datasets)")
         lines.append("")
         lines.append("--- fields ---")
         lines.append("")

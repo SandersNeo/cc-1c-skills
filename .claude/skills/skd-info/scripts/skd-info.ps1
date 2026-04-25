@@ -1350,7 +1350,17 @@ elseif ($Mode -eq "full") {
 	Show-Overview
 	$lines.Add(""); $lines.Add("--- query ---"); $lines.Add("")
 	$hasQuery = $root.SelectNodes("descendant::s:dataSet[@xsi:type='DataSetQuery']", $ns).Count -gt 0
-	if ($hasQuery) { Show-Query } else { $lines.Add("(no query datasets)") }
+	if ($hasQuery) {
+		Show-Query
+	} else {
+		$objNodes = $root.SelectNodes("descendant::s:dataSet[@xsi:type='DataSetObject']/s:objectName", $ns)
+		if ($objNodes.Count -gt 0) {
+			$names = @(); foreach ($n in $objNodes) { $names += $n.InnerText }
+			$lines.Add("(no query datasets; external datasets: $($names -join ', '))")
+		} else {
+			$lines.Add("(no query datasets)")
+		}
+	}
 	$lines.Add(""); $lines.Add("--- fields ---"); $lines.Add("")
 	Show-Fields
 	$lines.Add(""); $lines.Add("--- resources ---"); $lines.Add("")
