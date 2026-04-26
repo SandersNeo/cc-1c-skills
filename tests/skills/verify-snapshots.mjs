@@ -325,9 +325,11 @@ const STANDALONE_SKILLS = new Set([
 // schema and we know if it's accepted.
 const SKD_PLATFORM_VERIFY = new Set(['skd-compile', 'skd-edit']);
 
-// EPF/ERF skills — need epf-build to verify, not LoadConfigFromFiles
-const EPF_SKILLS = new Set([
-  'epf-init', 'erf-init', 'template-add', 'help-add',
+// EPF/ERF skills — verified by epf-build on the produced source.
+// Map skill -> output extension (.epf/.erf).
+const EPF_SKILLS = new Map([
+  ['epf-init', '.epf'],
+  ['erf-init', '.erf'],
 ]);
 
 // CFE skills — two-stage load: base config → extension
@@ -360,7 +362,8 @@ async function verifyCase(skillName, caseName, skillConfig, caseData, opts) {
   // Determine config dir
   const setupType = skillConfig.setup || 'empty-config';
   const isStandalone = STANDALONE_SKILLS.has(skillName);
-  const isEpf = EPF_SKILLS.has(skillName);
+  const epfExt = EPF_SKILLS.get(skillName);
+  const isEpf = !!epfExt;
   const isCfInit = CONFIG_INIT_SKILLS.has(skillName);
   // For 'empty-config': workDir is the config (setup creates it)
   // For cf-init: workDir becomes the config after the script runs
@@ -567,8 +570,32 @@ async function verifyCase(skillName, caseName, skillConfig, caseData, opts) {
     }
 
     if (isEpf) {
-      result.passed = true;
-      log('platform-load', true, 'skipped (EPF — verified by integration/platform-epf)');
+      const name = caseData.params?.name;
+      if (!name) {
+        result.errors.push(`EPF/ERF verify requires params.name`);
+        return result;
+      }
+      const sourceFile = join(workDir, `${name}.xml`);
+      if (!existsSync(sourceFile)) {
+        result.errors.push(`EPF/ERF source not found: ${sourceFile}`);
+        return result;
+      }
+      const outDir = join(workDir, '__build');
+      mkdirSync(outDir, { recursive: true });
+      const outFile = join(outDir, `${name}${epfExt}`);
+      try {
+        execSkill(opts.runtime, 'epf-build/scripts/epf-build', [
+          '-V8Path', opts.v8ctx.v8path,
+          '-SourceFile', sourceFile,
+          '-OutputFile', outFile,
+        ], 180_000);
+        log('epf-build', true, `platform built ${epfExt}`);
+        result.passed = true;
+      } catch (e) {
+        const detail = (e.stderr || e.stdout || e.message).trim();
+        log('epf-build', false, detail);
+        result.errors.push(`epf-build failed: ${detail.substring(0, 1000)}`);
+      }
       return result;
     }
 
@@ -752,7 +779,7 @@ const DEFAULT_SKILLS = [
   'meta-compile', 'form-compile', 'form-compile-from-object', 'form-add', 'form-edit',
   'role-compile', 'subsystem-compile', 'subsystem-edit',
   'cf-init', 'cf-edit', 'meta-edit', 'interface-edit',
-  'epf-init', 'template-add', 'help-add',
+  'epf-init', 'erf-init', 'template-add', 'help-add',
   'cfe-init', 'cfe-borrow', 'cfe-patch-method',
   'skd-compile', 'skd-edit', 'mxl-compile',
 ];
