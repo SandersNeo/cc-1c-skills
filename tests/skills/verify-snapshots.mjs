@@ -317,13 +317,17 @@ function runPreSteps(preRun, workDir, runtime, log) {
 // Standalone file skills — produce files (not configs), platform load = just run script
 const STANDALONE_SKILLS = new Set([
   'skd-compile', 'skd-edit', 'skd-info', 'skd-validate',
-  'mxl-compile', 'mxl-decompile', 'mxl-info', 'mxl-validate',
+  'mxl-decompile', 'mxl-info', 'mxl-validate',
 ]);
 
 // Standalone skills that CAN be platform-verified by wrapping their output in
 // an external report (ERF) and running erf-build — the platform parses the
 // schema and we know if it's accepted.
 const SKD_PLATFORM_VERIFY = new Set(['skd-compile', 'skd-edit']);
+
+// MXL: wrap produced Template.xml as a SpreadsheetDocument template inside
+// an EPF source and run epf-build — platform parses the macro layout.
+const MXL_PLATFORM_VERIFY = new Set(['mxl-compile']);
 
 // EPF/ERF skills — verified by epf-build on the produced source.
 // Map skill -> output extension (.epf/.erf).
@@ -563,6 +567,57 @@ async function verifyCase(skillName, caseName, skillConfig, caseData, opts) {
         const detail = (e.stderr || e.stdout || e.message).trim();
         log('erf-build', false, detail);
         result.errors.push(`erf-build rejected schema: ${detail.substring(0, 1000)}`);
+      }
+      return result;
+    }
+
+    if (MXL_PLATFORM_VERIFY.has(skillName)) {
+      const tplName = caseData.params?.outputPath || 'Template.xml';
+      const tplPath = join(workDir, tplName);
+      if (!existsSync(tplPath)) {
+        result.errors.push(`Output not produced at ${tplPath}`);
+        return result;
+      }
+      const epfDir = join(workDir, 'epf-src');
+      const epfOutDir = join(workDir, 'epf-build');
+      mkdirSync(epfOutDir, { recursive: true });
+      try {
+        execSkill(opts.runtime, 'epf-init/scripts/init', ['-Name', 'TestProc', '-SrcDir', epfDir]);
+        log('epf-init', true);
+      } catch (e) {
+        const detail = (e.stderr || e.stdout || e.message).trim();
+        log('epf-init', false, detail);
+        result.errors.push(`epf-init failed: ${detail.substring(0, 500)}`);
+        return result;
+      }
+      try {
+        execSkill(opts.runtime, 'template-add/scripts/add-template', [
+          '-ObjectName', 'TestProc',
+          '-TemplateName', 'Макет',
+          '-TemplateType', 'SpreadsheetDocument',
+          '-SrcDir', epfDir,
+        ]);
+        log('template-add', true);
+      } catch (e) {
+        const detail = (e.stderr || e.stdout || e.message).trim();
+        log('template-add', false, detail);
+        result.errors.push(`template-add failed: ${detail.substring(0, 500)}`);
+        return result;
+      }
+      const tplDest = join(epfDir, 'TestProc', 'Templates', 'Макет', 'Ext', 'Template.xml');
+      cpSync(tplPath, tplDest, { force: true });
+      try {
+        execSkill(opts.runtime, 'epf-build/scripts/epf-build', [
+          '-V8Path', opts.v8ctx.v8path,
+          '-SourceFile', join(epfDir, 'TestProc.xml'),
+          '-OutputFile', join(epfOutDir, 'TestProc.epf'),
+        ], 180_000);
+        log('epf-build', true, 'platform accepted MXL');
+        result.passed = true;
+      } catch (e) {
+        const detail = (e.stderr || e.stdout || e.message).trim();
+        log('epf-build', false, detail);
+        result.errors.push(`epf-build rejected MXL: ${detail.substring(0, 1000)}`);
       }
       return result;
     }
