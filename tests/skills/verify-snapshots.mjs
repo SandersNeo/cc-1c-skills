@@ -332,6 +332,10 @@ const EPF_SKILLS = new Map([
   ['erf-init', '.erf'],
 ]);
 
+// Skills that produce either an EPF/ERF source or a full Configuration —
+// route is auto-detected after the main script runs.
+const EPF_OR_CONFIG_SKILLS = new Set(['template-add', 'help-add']);
+
 // CFE skills — two-stage load: base config → extension
 const CFE_SKILLS = new Set([
   'cfe-init', 'cfe-borrow', 'cfe-patch-method',
@@ -362,13 +366,13 @@ async function verifyCase(skillName, caseName, skillConfig, caseData, opts) {
   // Determine config dir
   const setupType = skillConfig.setup || 'empty-config';
   const isStandalone = STANDALONE_SKILLS.has(skillName);
-  const epfExt = EPF_SKILLS.get(skillName);
-  const isEpf = !!epfExt;
+  let epfExt = EPF_SKILLS.get(skillName);
+  let isEpf = !!epfExt;
   const isCfInit = CONFIG_INIT_SKILLS.has(skillName);
   // For 'empty-config': workDir is the config (setup creates it)
   // For cf-init: workDir becomes the config after the script runs
   // For 'none' + non-special: no config (standalone/EPF)
-  const configDir = (setupType === 'empty-config' || isCfInit) ? workDir : null;
+  let configDir = (setupType === 'empty-config' || isCfInit) ? workDir : null;
 
   try {
     // ── Step 0: Case-level fixture copy (runner.mjs compatibility) ──
@@ -569,10 +573,31 @@ async function verifyCase(skillName, caseName, skillConfig, caseData, opts) {
       return result;
     }
 
+    // Auto-detect: skills like template-add/help-add can target either an
+    // EPF/ERF source or a full configuration. If Configuration.xml is absent
+    // but a *.xml source for the named object is, route via epf-build.
+    if (!isEpf && EPF_OR_CONFIG_SKILLS.has(skillName)) {
+      const hasConfig = existsSync(join(workDir, 'Configuration.xml'));
+      if (hasConfig) {
+        configDir = workDir;
+      } else {
+        const epfName = caseData.params?.objectName || caseData.params?.name;
+        if (epfName) {
+          const xmlPath = join(workDir, `${epfName}.xml`);
+          if (existsSync(xmlPath)) {
+            const xml = readFileSync(xmlPath, 'utf8');
+            if (/<ExternalDataProcessor[\s>]/.test(xml)) epfExt = '.epf';
+            else if (/<ExternalReport[\s>]/.test(xml)) epfExt = '.erf';
+            isEpf = !!epfExt;
+          }
+        }
+      }
+    }
+
     if (isEpf) {
-      const name = caseData.params?.name;
+      const name = caseData.params?.name || caseData.params?.objectName;
       if (!name) {
-        result.errors.push(`EPF/ERF verify requires params.name`);
+        result.errors.push(`EPF/ERF verify requires params.name or params.objectName`);
         return result;
       }
       const sourceFile = join(workDir, `${name}.xml`);
