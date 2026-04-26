@@ -116,8 +116,9 @@ function extractTypeRefs(input) {
 
 function getStructuralDeps(input) {
   const deps = [];
+  const hostEdits = []; // edits applied to the host (the input that triggered the dep)
   const inputs = Array.isArray(input) ? input : [input];
-  if (!inputs[0] || !inputs[0].type) return deps;
+  if (!inputs[0] || !inputs[0].type) return { deps, hostEdits };
 
   for (const inp of inputs) {
     const regTypePrefix = {
@@ -126,11 +127,18 @@ function getStructuralDeps(input) {
       CalculationRegister: 'CalculationRegister',
     }[inp.type];
 
-    if (regTypePrefix) {
+    // InformationRegister needs a registrar only when subordinated to a recorder
+    // (writeMode: 'Subordinate' / RecorderSubordinate).
+    const isSubordinatedInfoReg = inp.type === 'InformationRegister' &&
+      (inp.writeMode === 'Subordinate' || inp.writeMode === 'RecorderSubordinate' ||
+       inp.recorderSubordinate === true);
+    const effectivePrefix = regTypePrefix || (isSubordinatedInfoReg ? 'InformationRegister' : null);
+
+    if (effectivePrefix) {
       deps.push({
         type: 'Document', name: 'ТестовыйДокумент',
         dsl: { type: 'Document', name: 'ТестовыйДокумент' },
-        postEdit: [{ op: 'add-registerRecord', val: `${regTypePrefix}.${inp.name}` }],
+        postEdit: [{ op: 'add-registerRecord', val: `${effectivePrefix}.${inp.name}` }],
       });
     }
 
@@ -151,9 +159,28 @@ function getStructuralDeps(input) {
           }
         }
         break;
+      case 'ChartOfAccounts': {
+        // ExtDimensionTypes (виды субконто) link is required when the chart uses
+        // any ExtDimension at all — otherwise platform rejects forms that bind to
+        // Объект.ExtDimensionTypes.*.
+        const usesExtDim = (inp.maxExtDimensionCount && inp.maxExtDimensionCount > 0)
+          || (Array.isArray(inp.extDimensionAccountingFlags) && inp.extDimensionAccountingFlags.length > 0);
+        if (usesExtDim && !inp.extDimensionTypes) {
+          const stubName = `ВидыСубконтоСтаб${inp.name}`;
+          deps.push({
+            type: 'ChartOfCharacteristicTypes', name: stubName,
+            dsl: { type: 'ChartOfCharacteristicTypes', name: stubName, codeLength: 9, descriptionLength: 100 },
+          });
+          hostEdits.push({
+            hostType: 'ChartOfAccounts', hostName: inp.name,
+            op: 'modify-property', val: `ExtDimensionTypes=ChartOfCharacteristicTypes.${stubName}`,
+          });
+        }
+        break;
+      }
     }
   }
-  return deps;
+  return { deps, hostEdits };
 }
 
 // ─── Stub creation ──────────────────────────────────────────────────────────
@@ -425,8 +452,10 @@ async function verifyCase(skillName, caseName, skillConfig, caseData, opts) {
     if (configDir && allInputs.length > 0) {
       const mainNames = new Set(allInputs.map(i => `${i.type}.${i.name}`));
 
-      // Structural deps
-      const structDeps = getStructuralDeps(caseData.input || {});
+      // Structural deps (scanned across both main input and preRun inputs)
+      const { deps: structDeps, hostEdits: structHostEdits } = getStructuralDeps(allInputs);
+      // Stash host edits on the result so we can apply them after preRun.
+      result._structHostEdits = structHostEdits;
       const structDSLs = new Map();
       const structPostEdits = new Map();
       for (const dep of structDeps) {
@@ -488,6 +517,26 @@ async function verifyCase(skillName, caseName, skillConfig, caseData, opts) {
     } catch (e) {
       result.errors.push(e.message);
       return result;
+    }
+
+    // ── Step 3.5: host-level structural edits (apply to objects created in preRun) ──
+    if (configDir && result._structHostEdits?.length) {
+      for (const he of result._structHostEdits) {
+        const dir = TYPE_TO_DIR[he.hostType];
+        const objPath = dir ? join(configDir, dir, he.hostName) : null;
+        if (!objPath || !existsSync(objPath)) {
+          result.warnings.push(`HostEdit skipped (object not found): ${he.hostType}.${he.hostName}`);
+          continue;
+        }
+        try {
+          execSkill(opts.runtime, 'meta-edit/scripts/meta-edit',
+            ['-ObjectPath', objPath, '-Operation', he.op, '-Value', he.val]);
+          log(`hostEdit: ${he.hostType}.${he.hostName}`, true, `${he.op} ${he.val}`);
+        } catch (e) {
+          log(`hostEdit: ${he.hostType}.${he.hostName}`, false, e.stderr || e.message);
+          result.warnings.push(`HostEdit failed: ${he.hostType}.${he.hostName}`);
+        }
+      }
     }
 
     // ── Step 4: Main skill script ──
