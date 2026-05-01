@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# form-compile v1.6 — Compile 1C managed form from JSON or object metadata
+# form-compile v1.7 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import copy
@@ -1455,7 +1455,7 @@ CFG_REF_PATTERN = re.compile(
 )
 
 KNOWN_INVALID_TYPES = {
-    'FormDataStructure': 'Runtime type. Use cfg:*Object.XXX (e.g. CatalogObject.XXX)',
+    'FormDataStructure': 'Runtime type. Use object type without cfg: prefix (e.g. CatalogObject.Контрагенты, DocumentObject.Приход)',
     'FormDataCollection': 'Runtime type. Use ValueTable',
     'FormDataTree': 'Runtime type. Use ValueTree',
     'FormDataTreeItem': 'Runtime type, not valid in XML',
@@ -1489,6 +1489,9 @@ _FORM_TYPE_SYNONYMS = {
 def resolve_type_str(type_str):
     if not type_str:
         return type_str
+    # Lenient: strip leading cfg: prefix if user passed it (canonical form is without prefix)
+    if type_str.startswith('cfg:'):
+        type_str = type_str[4:]
     m = re.match(r'^([^(]+)\((.+)\)$', type_str)
     if m:
         base, params = m.group(1).strip(), m.group(2)

@@ -1,4 +1,4 @@
-﻿# form-compile v1.6 — Compile 1C managed form from JSON or object metadata
+﻿# form-compile v1.7 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$JsonPath,
@@ -1554,7 +1554,7 @@ $script:formTypeSynonyms["определяемыйтип"]             = "Define
 
 # Known invalid types (runtime/UI types that don't exist in XDTO schema)
 $script:knownInvalidTypes = @{
-	"FormDataStructure"     = "Runtime type. Use cfg:*Object.XXX (e.g. CatalogObject.XXX)"
+	"FormDataStructure"     = "Runtime type. Use object type without cfg: prefix (e.g. CatalogObject.Контрагенты, DocumentObject.Приход)"
 	"FormDataCollection"    = "Runtime type. Use ValueTable"
 	"FormDataTree"          = "Runtime type. Use ValueTree"
 	"FormDataTreeItem"      = "Runtime type, not valid in XML"
@@ -1569,6 +1569,8 @@ $script:knownInvalidTypes = @{
 function Resolve-TypeStr {
 	param([string]$typeStr)
 	if (-not $typeStr) { return $typeStr }
+	# Lenient: strip leading cfg: prefix if user passed it (canonical form is without prefix)
+	if ($typeStr -match '^cfg:(.+)$') { $typeStr = $Matches[1] }
 	if ($typeStr -match '^([^(]+)\((.+)\)$') {
 		$base = $Matches[1].Trim(); $params = $Matches[2]
 		$r = $script:formTypeSynonyms[$base.ToLower()]
