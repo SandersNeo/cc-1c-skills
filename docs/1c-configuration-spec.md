@@ -381,19 +381,51 @@ ClassId — фиксированные идентификаторы классо
 
 Подробнее: [1c-subsystem-spec.md § 4](1c-subsystem-spec.md#4-формат-командного-интерфейса-commandinterfacexml).
 
-**ClientApplicationInterface.xml** — расположение панелей (top/left/bottom/right):
+**ClientApplicationInterface.xml** — расположение панелей рабочего пространства Taxi.
+
+Структура: четыре стороны (`top`, `left`, `right`, `bottom`), внутри каждой произвольная комбинация `<panel>` и `<group>`. Список объявленных панелей — `<panelDef>` на верхнем уровне.
 
 ```xml
-<ClientApplicationInterface xmlns="http://v8.1c.ru/8.2/managed-application/core" ...>
+<ClientApplicationInterface xmlns="http://v8.1c.ru/8.2/managed-application/core" ... xsi:type="InterfaceLayouter">
   <top>
-    <group id="...">
-      <group><panel id="..."><uuid>...</uuid></panel></group>
-      ...
-    </group>
+    <panel id="<arbitrary-uuid>"><uuid>cbab57f2-a0f3-4f0a-89ea-4cb19570ab75</uuid></panel>
   </top>
-  <left>...</left>
+  <left>
+    <panel id="<arbitrary-uuid>"><uuid>b553047f-c9aa-4157-978d-448ecad24248</uuid></panel>
+  </left>
+  <right>
+    <group id="<arbitrary-uuid>">
+      <group><panel id="..."><uuid>13322b22-...</uuid></panel></group>
+      <group><panel id="..."><uuid>c933ac92-...</uuid></panel></group>
+    </group>
+  </right>
+  <panelDef id="b553047f-c9aa-4157-978d-448ecad24248"/>
+  <panelDef id="cbab57f2-a0f3-4f0a-89ea-4cb19570ab75"/>
+  <panelDef id="13322b22-3960-4d68-93a6-fe2dd7f28ca3"/>
+  <panelDef id="c933ac92-92cd-459d-81cc-e0c8a83ced99"/>
+  <panelDef id="b2735bd3-d822-4430-ba59-c9e869693b24"/>
 </ClientApplicationInterface>
 ```
+
+**UUID платформенных панелей** (фиксированные константы во всех конфигурациях):
+
+| UUID | Панель |
+|------|--------|
+| `cbab57f2-a0f3-4f0a-89ea-4cb19570ab75` | Панель открытых |
+| `b553047f-c9aa-4157-978d-448ecad24248` | Панель разделов |
+| `13322b22-3960-4d68-93a6-fe2dd7f28ca3` | Панель избранного |
+| `c933ac92-92cd-459d-81cc-e0c8a83ced99` | Панель истории |
+| `b2735bd3-d822-4430-ba59-c9e869693b24` | Панель функций текущего раздела |
+
+**Семантика контейнеров:**
+- Несколько прямых child-узлов внутри `<top>`/`<left>`/`<right>`/`<bottom>` располагаются **рядом** друг с другом (отдельные слоты на стороне).
+- `<group id="...">` — контейнер-«ячейка»: вложенные `<panel>`/`<group>` располагаются **друг под другом** (стек).
+- Атрибут `id` у `<group>` и `<panel>` — произвольный uuid экземпляра (Конфигуратор генерирует свой при сохранении). Привязка к платформенной панели — только через `<uuid>` внутри `<panel>`.
+- `<panelDef id="...">` объявляет, что панель доступна пользователю. Если панель не размещена в `top/left/right/bottom`, она остаётся скрытой, но доступна через «Вид → Настройка панелей».
+
+**Дефолтная раскладка** (как в типовых ERP/БП ≥ 8.3.24): «Панель открытых» в `top`, «Панель разделов» в `left`; «Функций», «Избранного», «История» — только в `panelDef`, по умолчанию не размещены.
+
+> Замечание: в типовых конфигурациях встречается также `<panelDef id="8e10648b-...87de33778d95"/>` — наследие от старых версий платформы. В новых конфигурациях с нуля Конфигуратор её не создаёт; не закладывайте на неё логику.
 
 ### 4.3. Начальная страница
 
