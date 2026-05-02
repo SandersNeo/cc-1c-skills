@@ -64,7 +64,7 @@
 	<Attributes>
 		<Attribute name="Объект" id="23">
 			<Type>
-				<v8:Type>cfg:ExternalDataProcessorObject.Инфо</v8:Type>
+				<v8:Type>cfg:DataProcessorObject.Инфо</v8:Type>
 			</Type>
 			<MainAttribute>true</MainAttribute>
 		</Attribute>
