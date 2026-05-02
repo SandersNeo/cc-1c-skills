@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# form-compile v1.13 — Compile 1C managed form from JSON or object metadata
+# form-compile v1.14 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import copy
@@ -625,6 +625,7 @@ def generate_document_list_dsl(meta, p):
 
     table_el = OrderedDict([
         ('table', '\u0421\u043f\u0438\u0441\u043e\u043a'), ('path', '\u0421\u043f\u0438\u0441\u043e\u043a'),
+        ('rowPictureDataPath', '\u0421\u043f\u0438\u0441\u043e\u043a.DefaultPicture'),
         ('commandBarLocation', 'None'),
         ('tableAutofill', False),
         ('columns', columns),
@@ -938,6 +939,7 @@ def generate_information_register_list_dsl(meta, p):
     table_el = OrderedDict([
         ('table', '\u0421\u043f\u0438\u0441\u043e\u043a'),
         ('path', '\u0421\u043f\u0438\u0441\u043e\u043a'),
+        ('rowPictureDataPath', '\u0421\u043f\u0438\u0441\u043e\u043a.DefaultPicture'),
         ('commandBarLocation', 'None'),
         ('tableAutofill', False),
         ('columns', columns_list),
@@ -996,6 +998,7 @@ def generate_accumulation_register_list_dsl(meta, p):
     table_el = OrderedDict([
         ('table', '\u0421\u043f\u0438\u0441\u043e\u043a'),
         ('path', '\u0421\u043f\u0438\u0441\u043e\u043a'),
+        ('rowPictureDataPath', '\u0421\u043f\u0438\u0441\u043e\u043a.DefaultPicture'),
         ('commandBarLocation', 'None'),
         ('tableAutofill', False),
         ('columns', columns_list),
@@ -2599,7 +2602,7 @@ def main():
                     return True
         return False
 
-    def _apply_dlist_table_heuristic(el, list_name):
+    def _apply_dlist_table_heuristic(el, list_name, has_main_table):
         if not isinstance(el, dict):
             return
         if el.get('table') is not None and str(el.get('path', '')) == list_name:
@@ -2607,9 +2610,12 @@ def main():
                 el['tableAutofill'] = False
             if 'commandBarLocation' not in el:
                 el['commandBarLocation'] = 'None'
+            # DefaultPicture доступен только если у DynamicList есть основная таблица
+            if has_main_table and not el.get('rowPictureDataPath'):
+                el['rowPictureDataPath'] = f'{list_name}.DefaultPicture'
         if isinstance(el.get('children'), list):
             for child in el['children']:
-                _apply_dlist_table_heuristic(child, list_name)
+                _apply_dlist_table_heuristic(child, list_name, has_main_table)
 
     def _is_object_like_type(t):
         if not t:
@@ -2674,8 +2680,10 @@ def main():
     if isinstance(defn.get('attributes'), list) and isinstance(defn.get('elements'), list):
         main_attr = next((a for a in defn['attributes'] if isinstance(a, dict) and a.get('main') is True), None)
         if main_attr and str(main_attr.get('type', '')) == 'DynamicList':
+            settings = main_attr.get('settings') or {}
+            has_mt = bool(isinstance(settings, dict) and settings.get('mainTable'))
             for el in defn['elements']:
-                _apply_dlist_table_heuristic(el, main_attr.get('name', ''))
+                _apply_dlist_table_heuristic(el, main_attr.get('name', ''), has_mt)
 
     # 1b.5: Compute main AutoCommandBar Autofill (B3)
     def _compute_main_acb_autofill():

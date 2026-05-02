@@ -1,4 +1,4 @@
-﻿# form-compile v1.13 — Compile 1C managed form from JSON or object metadata
+﻿# form-compile v1.14 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$JsonPath,
@@ -668,6 +668,7 @@ function Generate-DocumentListDSL($meta, [hashtable]$p) {
 
 	$tableEl = [ordered]@{
 		table = "Список"; path = "Список"
+		rowPictureDataPath = "Список.DefaultPicture"
 		commandBarLocation = "None"
 		tableAutofill = $false
 		columns = $columns
@@ -1003,6 +1004,7 @@ function Generate-InformationRegisterListDSL($meta, [hashtable]$p) {
 
 	$tableEl = [ordered]@{
 		table = "Список"; path = "Список"
+		rowPictureDataPath = "Список.DefaultPicture"
 		commandBarLocation = "None"
 		tableAutofill = $false
 		columns = $columns
@@ -1060,6 +1062,7 @@ function Generate-AccumulationRegisterListDSL($meta, [hashtable]$p) {
 
 	$tableEl = [ordered]@{
 		table = "Список"; path = "Список"
+		rowPictureDataPath = "Список.DefaultPicture"
 		commandBarLocation = "None"
 		tableAutofill = $false
 		columns = $columns
@@ -2680,7 +2683,7 @@ function HasCmdBarRecursive {
 }
 
 function ApplyDynamicListTableHeuristic {
-	param($el, [string]$listName)
+	param($el, [string]$listName, [bool]$hasMainTable)
 	if ($null -eq $el) { return }
 	if ($el.PSObject.Properties["table"] -and $null -ne $el.table -and "$($el.path)" -eq $listName) {
 		if ($null -eq $el.PSObject.Properties["tableAutofill"]) {
@@ -2689,9 +2692,13 @@ function ApplyDynamicListTableHeuristic {
 		if ($null -eq $el.PSObject.Properties["commandBarLocation"]) {
 			$el | Add-Member -NotePropertyName "commandBarLocation" -NotePropertyValue "None" -Force
 		}
+		# DefaultPicture доступен только если у DynamicList есть основная таблица
+		if ($hasMainTable -and ($null -eq $el.PSObject.Properties["rowPictureDataPath"] -or [string]::IsNullOrEmpty("$($el.rowPictureDataPath)"))) {
+			$el | Add-Member -NotePropertyName "rowPictureDataPath" -NotePropertyValue "$listName.DefaultPicture" -Force
+		}
 	}
 	if ($el.PSObject.Properties["children"] -and $el.children) {
-		foreach ($child in $el.children) { ApplyDynamicListTableHeuristic $child $listName }
+		foreach ($child in $el.children) { ApplyDynamicListTableHeuristic $child $listName $hasMainTable }
 	}
 }
 
@@ -2780,8 +2787,17 @@ if ($def.attributes -and $def.elements) {
 		if ($attr.main -eq $true) { $mainAttr = $attr; break }
 	}
 	if ($mainAttr -and "$($mainAttr.type)" -eq "DynamicList") {
+		$mt = $null
+		if ($mainAttr.PSObject.Properties["settings"] -and $null -ne $mainAttr.settings) {
+			if ($mainAttr.settings -is [hashtable]) {
+				if ($mainAttr.settings.ContainsKey("mainTable")) { $mt = $mainAttr.settings["mainTable"] }
+			} elseif ($mainAttr.settings.PSObject.Properties["mainTable"]) {
+				$mt = $mainAttr.settings.mainTable
+			}
+		}
+		$hasMt = -not [string]::IsNullOrEmpty("$mt")
 		foreach ($el in $def.elements) {
-			ApplyDynamicListTableHeuristic $el $mainAttr.name
+			ApplyDynamicListTableHeuristic $el $mainAttr.name $hasMt
 		}
 	}
 }
