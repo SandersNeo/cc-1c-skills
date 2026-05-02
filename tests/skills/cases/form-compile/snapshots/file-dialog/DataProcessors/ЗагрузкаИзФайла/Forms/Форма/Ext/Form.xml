@@ -54,6 +54,7 @@
 			</Title>
 			<ReadOnly>true</ReadOnly>
 			<MultiLine>true</MultiLine>
+			<AutoMaxWidth>false</AutoMaxWidth>
 			<Height>8</Height>
 			<ContextMenu name="РезультатКонтекстноеМеню" id="10"/>
 			<ExtendedTooltip name="РезультатРасширеннаяПодсказка" id="11"/>

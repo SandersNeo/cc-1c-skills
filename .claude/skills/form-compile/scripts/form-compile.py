@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# form-compile v1.14 — Compile 1C managed form from JSON or object metadata
+# form-compile v1.15 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import copy
@@ -1757,7 +1757,10 @@ def emit_input(lines, el, name, eid, indent):
         lines.append(f'{inner}<AutoMarkIncomplete>true</AutoMarkIncomplete>')
     if el.get('skipOnInput') is True:
         lines.append(f'{inner}<SkipOnInput>true</SkipOnInput>')
-    if el.get('autoMaxWidth') is False:
+    if 'autoMaxWidth' in el:
+        if el['autoMaxWidth'] is False:
+            lines.append(f'{inner}<AutoMaxWidth>false</AutoMaxWidth>')
+    elif el.get('multiLine') is True:
         lines.append(f'{inner}<AutoMaxWidth>false</AutoMaxWidth>')
     if el.get('autoMaxHeight') is False:
         lines.append(f'{inner}<AutoMaxHeight>false</AutoMaxHeight>')

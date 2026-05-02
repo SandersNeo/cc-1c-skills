@@ -1,4 +1,4 @@
-﻿# form-compile v1.14 — Compile 1C managed form from JSON or object metadata
+﻿# form-compile v1.15 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$JsonPath,
@@ -2051,7 +2051,12 @@ function Emit-Input {
 	if ($el.dropListButton -eq $true) { X "$inner<DropListButton>true</DropListButton>" }
 	if ($el.markIncomplete -eq $true) { X "$inner<AutoMarkIncomplete>true</AutoMarkIncomplete>" }
 	if ($el.skipOnInput -eq $true) { X "$inner<SkipOnInput>true</SkipOnInput>" }
-	if ($el.autoMaxWidth -eq $false) { X "$inner<AutoMaxWidth>false</AutoMaxWidth>" }
+	$hasAmw = $el.PSObject.Properties.Name -contains 'autoMaxWidth'
+	if ($hasAmw) {
+		if ($el.autoMaxWidth -eq $false) { X "$inner<AutoMaxWidth>false</AutoMaxWidth>" }
+	} elseif ($el.multiLine -eq $true) {
+		X "$inner<AutoMaxWidth>false</AutoMaxWidth>"
+	}
 	if ($el.autoMaxHeight -eq $false) { X "$inner<AutoMaxHeight>false</AutoMaxHeight>" }
 	if ($el.width) { X "$inner<Width>$($el.width)</Width>" }
 	if ($el.height) { X "$inner<Height>$($el.height)</Height>" }

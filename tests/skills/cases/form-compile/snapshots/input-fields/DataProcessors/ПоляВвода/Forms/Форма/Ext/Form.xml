@@ -29,6 +29,7 @@
 				</v8:item>
 			</Title>
 			<MultiLine>true</MultiLine>
+			<AutoMaxWidth>false</AutoMaxWidth>
 			<Height>5</Height>
 			<ContextMenu name="МногострочноеПолеКонтекстноеМеню" id="5"/>
 			<ExtendedTooltip name="МногострочноеПолеРасширеннаяПодсказка" id="6"/>

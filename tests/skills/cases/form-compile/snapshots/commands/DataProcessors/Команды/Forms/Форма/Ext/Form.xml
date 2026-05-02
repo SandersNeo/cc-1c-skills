@@ -28,6 +28,7 @@
 			<DataPath>Результат</DataPath>
 			<ReadOnly>true</ReadOnly>
 			<MultiLine>true</MultiLine>
+			<AutoMaxWidth>false</AutoMaxWidth>
 			<Height>8</Height>
 			<ContextMenu name="РезультатКонтекстноеМеню" id="7"/>
 			<ExtendedTooltip name="РезультатРасширеннаяПодсказка" id="8"/>
