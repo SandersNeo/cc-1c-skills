@@ -1,4 +1,4 @@
-﻿# meta-compile v1.10 — Compile 1C metadata object from JSON
+﻿# meta-compile v1.11 — Compile 1C metadata object from JSON
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[Parameter(Mandatory)]
@@ -1129,7 +1129,7 @@ function Emit-CatalogProperties {
 	X "$i<Characteristics/>"
 	X "$i<PredefinedDataUpdate>Auto</PredefinedDataUpdate>"
 	X "$i<EditType>InDialog</EditType>"
-	$quickChoice = if ($def.quickChoice -eq $false) { "false" } else { "true" }
+	$quickChoice = if ($def.quickChoice -eq $true) { "true" } else { "false" }
 	$choiceMode = Get-EnumProp "ChoiceMode" "choiceMode" "BothWays"
 	X "$i<QuickChoice>$quickChoice</QuickChoice>"
 	X "$i<ChoiceMode>$choiceMode</ChoiceMode>"
@@ -1292,7 +1292,8 @@ function Emit-EnumProperties {
 	Emit-StandardAttributes $i "Enum"
 	X "$i<Characteristics/>"
 
-	X "$i<QuickChoice>true</QuickChoice>"
+	$quickChoice = if ($def.quickChoice -eq $false) { "false" } else { "true" }
+	X "$i<QuickChoice>$quickChoice</QuickChoice>"
 	X "$i<ChoiceMode>BothWays</ChoiceMode>"
 	X "$i<DefaultListForm/>"
 	X "$i<DefaultChoiceForm/>"
@@ -1663,7 +1664,8 @@ function Emit-ExchangePlanProperties {
 	X "$i<IncludeConfigurationExtensions>$includeExt</IncludeConfigurationExtensions>"
 
 	X "$i<BasedOn/>"
-	X "$i<QuickChoice>true</QuickChoice>"
+	$quickChoice = if ($def.quickChoice -eq $true) { "true" } else { "false" }
+	X "$i<QuickChoice>$quickChoice</QuickChoice>"
 	X "$i<ChoiceMode>BothWays</ChoiceMode>"
 	X "$i<InputByString>"
 	X "$i`t<xr:Field>ExchangePlan.$objName.StandardAttribute.Description</xr:Field>"
@@ -1764,7 +1766,8 @@ function Emit-ChartOfCharacteristicTypesProperties {
 	X "$i<Characteristics/>"
 	X "$i<PredefinedDataUpdate>Auto</PredefinedDataUpdate>"
 	X "$i<EditType>InDialog</EditType>"
-	X "$i<QuickChoice>true</QuickChoice>"
+	$quickChoice = if ($def.quickChoice -eq $true) { "true" } else { "false" }
+	X "$i<QuickChoice>$quickChoice</QuickChoice>"
 	X "$i<ChoiceMode>BothWays</ChoiceMode>"
 	X "$i<InputByString>"
 	X "$i`t<xr:Field>ChartOfCharacteristicTypes.$objName.StandardAttribute.Description</xr:Field>"
@@ -1905,7 +1908,8 @@ function Emit-ChartOfAccountsProperties {
 
 	X "$i<Characteristics/>"
 	X "$i<PredefinedDataUpdate>Auto</PredefinedDataUpdate>"
-	X "$i<QuickChoice>true</QuickChoice>"
+	$quickChoice = if ($def.quickChoice -eq $true) { "true" } else { "false" }
+	X "$i<QuickChoice>$quickChoice</QuickChoice>"
 	X "$i<ChoiceMode>BothWays</ChoiceMode>"
 	X "$i<InputByString>"
 	X "$i`t<xr:Field>ChartOfAccounts.$objName.StandardAttribute.Description</xr:Field>"
@@ -2021,7 +2025,8 @@ function Emit-ChartOfCalculationTypesProperties {
 	X "$i<Characteristics/>"
 	X "$i<PredefinedDataUpdate>Auto</PredefinedDataUpdate>"
 	X "$i<EditType>InDialog</EditType>"
-	X "$i<QuickChoice>true</QuickChoice>"
+	$quickChoice = if ($def.quickChoice -eq $true) { "true" } else { "false" }
+	X "$i<QuickChoice>$quickChoice</QuickChoice>"
 	X "$i<ChoiceMode>BothWays</ChoiceMode>"
 	X "$i<InputByString>"
 	X "$i`t<xr:Field>ChartOfCalculationTypes.$objName.StandardAttribute.Description</xr:Field>"

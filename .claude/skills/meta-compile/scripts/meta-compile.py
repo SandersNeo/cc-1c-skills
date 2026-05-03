@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# meta-compile v1.10 — Compile 1C metadata object from JSON
+# meta-compile v1.11 — Compile 1C metadata object from JSON
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 
 import argparse
@@ -1024,7 +1024,7 @@ def emit_catalog_properties(indent):
     X(f'{i}<Characteristics/>')
     X(f'{i}<PredefinedDataUpdate>Auto</PredefinedDataUpdate>')
     X(f'{i}<EditType>InDialog</EditType>')
-    quick_choice = 'false' if defn.get('quickChoice') is False else 'true'
+    quick_choice = 'true' if defn.get('quickChoice') is True else 'false'
     choice_mode = get_enum_prop('ChoiceMode', 'choiceMode', 'BothWays')
     X(f'{i}<QuickChoice>{quick_choice}</QuickChoice>')
     X(f'{i}<ChoiceMode>{choice_mode}</ChoiceMode>')
@@ -1157,7 +1157,8 @@ def emit_enum_properties(indent):
     X(f'{i}<UseStandardCommands>false</UseStandardCommands>')
     emit_standard_attributes(i, 'Enum')
     X(f'{i}<Characteristics/>')
-    X(f'{i}<QuickChoice>true</QuickChoice>')
+    quick_choice = 'false' if defn.get('quickChoice') is False else 'true'
+    X(f'{i}<QuickChoice>{quick_choice}</QuickChoice>')
     X(f'{i}<ChoiceMode>BothWays</ChoiceMode>')
     X(f'{i}<DefaultListForm/>')
     X(f'{i}<DefaultChoiceForm/>')
@@ -1471,7 +1472,8 @@ def emit_exchange_plan_properties(indent):
     X(f'{i}<DistributedInfoBase>{distributed}</DistributedInfoBase>')
     X(f'{i}<IncludeConfigurationExtensions>{include_ext}</IncludeConfigurationExtensions>')
     X(f'{i}<BasedOn/>')
-    X(f'{i}<QuickChoice>true</QuickChoice>')
+    quick_choice = 'true' if defn.get('quickChoice') is True else 'false'
+    X(f'{i}<QuickChoice>{quick_choice}</QuickChoice>')
     X(f'{i}<ChoiceMode>BothWays</ChoiceMode>')
     X(f'{i}<InputByString>')
     X(f'{i}\t<xr:Field>ExchangePlan.{obj_name}.StandardAttribute.Description</xr:Field>')
@@ -1557,7 +1559,8 @@ def emit_chart_of_characteristic_types_properties(indent):
     X(f'{i}<Characteristics/>')
     X(f'{i}<PredefinedDataUpdate>Auto</PredefinedDataUpdate>')
     X(f'{i}<EditType>InDialog</EditType>')
-    X(f'{i}<QuickChoice>true</QuickChoice>')
+    quick_choice = 'true' if defn.get('quickChoice') is True else 'false'
+    X(f'{i}<QuickChoice>{quick_choice}</QuickChoice>')
     X(f'{i}<ChoiceMode>BothWays</ChoiceMode>')
     X(f'{i}<InputByString>')
     X(f'{i}\t<xr:Field>ChartOfCharacteristicTypes.{obj_name}.StandardAttribute.Description</xr:Field>')
@@ -1673,7 +1676,8 @@ def emit_chart_of_accounts_properties(indent):
     X(f'{i}</StandardTabularSections>')
     X(f'{i}<Characteristics/>')
     X(f'{i}<PredefinedDataUpdate>Auto</PredefinedDataUpdate>')
-    X(f'{i}<QuickChoice>true</QuickChoice>')
+    quick_choice = 'true' if defn.get('quickChoice') is True else 'false'
+    X(f'{i}<QuickChoice>{quick_choice}</QuickChoice>')
     X(f'{i}<ChoiceMode>BothWays</ChoiceMode>')
     X(f'{i}<InputByString>')
     X(f'{i}\t<xr:Field>ChartOfAccounts.{obj_name}.StandardAttribute.Description</xr:Field>')
@@ -1764,7 +1768,8 @@ def emit_chart_of_calculation_types_properties(indent):
     X(f'{i}<Characteristics/>')
     X(f'{i}<PredefinedDataUpdate>Auto</PredefinedDataUpdate>')
     X(f'{i}<EditType>InDialog</EditType>')
-    X(f'{i}<QuickChoice>true</QuickChoice>')
+    quick_choice = 'true' if defn.get('quickChoice') is True else 'false'
+    X(f'{i}<QuickChoice>{quick_choice}</QuickChoice>')
     X(f'{i}<ChoiceMode>BothWays</ChoiceMode>')
     X(f'{i}<InputByString>')
     X(f'{i}\t<xr:Field>ChartOfCalculationTypes.{obj_name}.StandardAttribute.Description</xr:Field>')

@@ -226,7 +226,7 @@
 			<DistributedInfoBase>true</DistributedInfoBase>
 			<IncludeConfigurationExtensions>false</IncludeConfigurationExtensions>
 			<BasedOn/>
-			<QuickChoice>true</QuickChoice>
+			<QuickChoice>false</QuickChoice>
 			<ChoiceMode>BothWays</ChoiceMode>
 			<InputByString>
 				<xr:Field>ExchangePlan.ОбменСФилиалами.StandardAttribute.Description</xr:Field>
