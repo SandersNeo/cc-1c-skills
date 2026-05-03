@@ -64,6 +64,7 @@ powershell.exe -NoProfile -File .claude/skills/form-compile/scripts/form-compile
 | `"group"`    | UsualGroup        | `"horizontal"` / `"vertical"` / `"alwaysHorizontal"` / `"alwaysVertical"` / `"collapsible"` |
 | `"input"`    | InputField        | имя элемента                                      |
 | `"check"`    | CheckBoxField     | имя                                               |
+| `"radio"`    | RadioButtonField  | имя                                               |
 | `"label"`    | LabelDecoration   | имя (текст задаётся через `title`)                |
 | `"labelField"` | LabelField      | имя                                               |
 | `"table"`    | Table             | имя                                               |
@@ -97,7 +98,7 @@ powershell.exe -NoProfile -File .claude/skills/form-compile/scripts/form-compile
 
 **input / picField**: `OnChange`, `StartChoice`, `ChoiceProcessing`, `AutoComplete`, `TextEditEnd`, `Clearing`, `Creating`, `EditTextChange`
 
-**check**: `OnChange`
+**check / radio**: `OnChange`
 
 **table**: `OnStartEdit`, `OnEditEnd`, `OnChange`, `Selection`, `ValueChoice`, `BeforeAddRow`, `BeforeDeleteRow`, `AfterDeleteRow`, `BeforeRowChange`, `BeforeEditEnd`, `OnActivateRow`, `OnActivateCell`, `Drag`, `DragStart`, `DragCheck`, `DragEnd`
 
@@ -134,6 +135,37 @@ powershell.exe -NoProfile -File .claude/skills/form-compile/scripts/form-compile
 |------|----------|
 | `path` | DataPath |
 | `titleLocation` | Размещение заголовка |
+
+### Поле переключателя (radio)
+
+Радиокнопки или тумблер для выбора одного значения из списка.
+
+| Ключ | Описание | Пример |
+|------|----------|--------|
+| `path` | DataPath — привязка к реквизиту | `"СпособКурса"` |
+| `radioButtonType` | Вид переключателя | `"Auto"` (по умолчанию), `"RadioButtons"`, `"Tumbler"` |
+| `columnsCount` | Число колонок раскладки | `1`, `2`, ... |
+| `titleLocation` | Размещение заголовка | по умолчанию `"none"` |
+| `choiceList` | Список вариантов: массив `{value, presentation}` | см. ниже |
+
+`choiceList[*]`:
+
+| Ключ | Описание |
+|------|----------|
+| `value` | Значение варианта. Строка/число/булево; для перечисления — `"Enum.ИмяТипа.EnumValue.ИмяЗначения"` |
+| `presentation` | Текст рядом с переключателем. Строка (русский) либо объект `{ru, en, ...}` для мультиязычности |
+
+```json
+{
+  "radio": "СпособКурса",
+  "path": "Объект.СпособУстановкиКурса",
+  "radioButtonType": "Auto",
+  "choiceList": [
+    { "value": "Enum.СпособыКурса.EnumValue.Авто",   "presentation": { "ru": "Автоматически", "en": "Automatic" } },
+    { "value": "Enum.СпособыКурса.EnumValue.Ручной", "presentation": "вручную" }
+  ]
+}
+```
 
 ### Надпись-декорация (label)
 

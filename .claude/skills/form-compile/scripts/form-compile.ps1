@@ -1,4 +1,4 @@
-﻿# form-compile v1.15 — Compile 1C managed form from JSON or object metadata
+﻿# form-compile v1.16 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$JsonPath,
@@ -1774,6 +1774,7 @@ function Get-ElementName {
 $script:knownEvents = @{
 	"input"     = @("OnChange","StartChoice","ChoiceProcessing","AutoComplete","TextEditEnd","Clearing","Creating","EditTextChange")
 	"check"     = @("OnChange")
+	"radio"     = @("OnChange")
 	"label"     = @("Click","URLProcessing")
 	"labelField"= @("OnChange","StartChoice","ChoiceProcessing","Click","URLProcessing","Clearing")
 	"table"     = @("Selection","BeforeAddRow","AfterDeleteRow","BeforeDeleteRow","OnActivateRow","OnEditEnd","OnStartEdit","BeforeRowChange","BeforeEditEnd","ValueChoice","OnActivateCell","OnActivateField","Drag","DragStart","DragCheck","DragEnd","OnGetDataAtServer","BeforeLoadUserSettingsAtServer","OnUpdateUserSettingSetAtServer","OnChange")
@@ -1826,9 +1827,43 @@ function Emit-Companion {
 function Emit-Element {
 	param($el, [string]$indent)
 
-	# Silent synonyms: commandBar -> cmdBar, autoCommandBar -> autoCmdBar
-	# (autoCmdBar inside def.elements is normally extracted in pre-pass; this is a safety net for nested cases)
-	$synonyms = @{ "commandBar" = "cmdBar"; "autoCommandBar" = "autoCmdBar" }
+	# Silent synonyms: model often writes XML name or Russian (ПолеПереключателя/RadioButtonField → radio).
+	# Maps any synonym to canonical short DSL key.
+	$synonyms = @{
+		"commandBar"        = "cmdBar"
+		"autoCommandBar"    = "autoCmdBar"
+		"КоманднаяПанель"   = "cmdBar"
+		"InputField"        = "input"
+		"ПолеВвода"         = "input"
+		"CheckBoxField"     = "check"
+		"ПолеФлажка"        = "check"
+		"RadioButtonField"  = "radio"
+		"ПолеПереключателя" = "radio"
+		"radioButton"       = "radio"
+		"PictureField"      = "picField"
+		"ПолеКартинки"      = "picField"
+		"LabelField"        = "labelField"
+		"ПолеНадписи"       = "labelField"
+		"CalendarField"     = "calendar"
+		"ПолеКалендаря"     = "calendar"
+		"LabelDecoration"   = "label"
+		"Надпись"           = "label"
+		"PictureDecoration" = "picture"
+		"Картинка"          = "picture"
+		"UsualGroup"        = "group"
+		"Группа"            = "group"
+		"ОбычнаяГруппа"     = "group"
+		"Pages"             = "pages"
+		"ГруппаСтраниц"     = "pages"
+		"Page"              = "page"
+		"Страница"          = "page"
+		"Table"             = "table"
+		"Таблица"           = "table"
+		"Button"            = "button"
+		"Кнопка"            = "button"
+		"Popup"             = "popup"
+		"ВсплывающееМеню"   = "popup"
+	}
 	foreach ($pair in $synonyms.GetEnumerator()) {
 		if ($null -ne $el.PSObject.Properties[$pair.Key] -and $null -eq $el.PSObject.Properties[$pair.Value]) {
 			$val = $el.($pair.Key)
@@ -1841,7 +1876,7 @@ function Emit-Element {
 	$typeKey = $null
 	$xmlTag = $null
 
-	foreach ($key in @("group","input","check","label","labelField","table","pages","page","button","picture","picField","calendar","cmdBar","popup")) {
+	foreach ($key in @("group","input","check","radio","label","labelField","table","pages","page","button","picture","picField","calendar","cmdBar","popup")) {
 		if ($el.$key -ne $null) {
 			$typeKey = $key
 			break
@@ -1856,8 +1891,10 @@ function Emit-Element {
 	# Validate known keys — warn about typos and unknown properties
 	$knownKeys = @{
 		# type keys
-		"group"=1;"input"=1;"check"=1;"label"=1;"labelField"=1;"table"=1;"pages"=1;"page"=1
+		"group"=1;"input"=1;"check"=1;"radio"=1;"label"=1;"labelField"=1;"table"=1;"pages"=1;"page"=1
 		"button"=1;"picture"=1;"picField"=1;"calendar"=1;"cmdBar"=1;"popup"=1
+		# radio-specific
+		"radioButtonType"=1;"choiceList"=1;"columnsCount"=1
 		# naming & binding
 		"name"=1;"path"=1;"title"=1
 		# visibility & state
@@ -1903,6 +1940,7 @@ function Emit-Element {
 		"group"    { Emit-Group -el $el -name $name -id $id -indent $indent }
 		"input"    { Emit-Input -el $el -name $name -id $id -indent $indent }
 		"check"    { Emit-Check -el $el -name $name -id $id -indent $indent }
+		"radio"    { Emit-Radio -el $el -name $name -id $id -indent $indent }
 		"label"    { Emit-Label -el $el -name $name -id $id -indent $indent }
 		"labelField" { Emit-LabelField -el $el -name $name -id $id -indent $indent }
 		"table"    { Emit-Table -el $el -name $name -id $id -indent $indent }
@@ -2097,6 +2135,224 @@ function Emit-Check {
 	Emit-Events -el $el -elementName $name -indent $inner -typeKey "check"
 
 	X "$indent</CheckBoxField>"
+}
+
+# Maps Russian/English root of a typed reference path to canonical English root.
+# Used to normalize ChoiceList values like "Перечисление.X.Y" → "Enum.X.EnumValue.Y".
+$script:refRootSynonyms = @{
+	"Перечисление"            = "Enum"
+	"Справочник"              = "Catalog"
+	"Документ"                = "Document"
+	"ПланСчетов"              = "ChartOfAccounts"
+	"ПланВидовХарактеристик"  = "ChartOfCharacteristicTypes"
+	"ПланВидовРасчета"        = "ChartOfCalculationTypes"
+	"ПланВидовРасчёта"        = "ChartOfCalculationTypes"
+	"ПланОбмена"              = "ExchangePlan"
+	"БизнесПроцесс"           = "BusinessProcess"
+	"Задача"                  = "Task"
+	"РегистрСведений"         = "InformationRegister"
+	"РегистрНакопления"       = "AccumulationRegister"
+	"РегистрБухгалтерии"      = "AccountingRegister"
+	"РегистрРасчета"          = "CalculationRegister"
+	"РегистрРасчёта"          = "CalculationRegister"
+}
+$script:enumValueSynonyms = @("EnumValue","ЗначениеПеречисления")
+
+# Normalize a choiceList item value: returns @{ XsiType = "..."; Text = "..." }
+function Normalize-ChoiceValue {
+	param($value)
+
+	# Booleans
+	if ($value -is [bool]) {
+		return @{ XsiType = "xs:boolean"; Text = if ($value) { "true" } else { "false" } }
+	}
+	# Numbers (int / decimal / double)
+	if ($value -is [int] -or $value -is [long] -or $value -is [double] -or $value -is [decimal]) {
+		return @{ XsiType = "xs:decimal"; Text = "$value" }
+	}
+
+	$s = "$value"
+	if ([string]::IsNullOrEmpty($s)) {
+		return @{ XsiType = "xs:string"; Text = "" }
+	}
+
+	# Try to detect typed reference path: "<Root>.<Type>[.<Member>.<Value>]"
+	$parts = $s -split '\.'
+	if ($parts.Count -ge 2) {
+		$root = $parts[0]
+		$canonRoot = $null
+		if ($script:refRootSynonyms.ContainsKey($root)) { $canonRoot = $script:refRootSynonyms[$root] }
+		elseif ($script:refRootSynonyms.Values -contains $root) { $canonRoot = $root }
+
+		if ($canonRoot) {
+			$typeName = $parts[1]
+			$normalized = $null
+
+			if ($canonRoot -eq "Enum") {
+				if ($parts.Count -eq 2) {
+					# "Enum.X" alone — not a value, treat as string
+				} elseif ($parts.Count -eq 3) {
+					# "Enum.X.Y" — insert .EnumValue.
+					$normalized = "Enum.$typeName.EnumValue.$($parts[2])"
+				} else {
+					# "Enum.X.<member>.Y..."  — replace member with EnumValue (handles ЗначениеПеречисления too)
+					$member = $parts[2]
+					if ($script:enumValueSynonyms -contains $member) {
+						$rest = $parts[3..($parts.Count-1)] -join '.'
+						$normalized = "Enum.$typeName.EnumValue.$rest"
+					} else {
+						$rest = $parts[2..($parts.Count-1)] -join '.'
+						$normalized = "Enum.$typeName.EnumValue.$rest"
+					}
+				}
+			} else {
+				# Other ref roots: just translate root, keep tail as-is
+				if ($parts.Count -ge 3) {
+					$tail = $parts[1..($parts.Count-1)] -join '.'
+					$normalized = "$canonRoot.$tail"
+				}
+			}
+
+			if ($normalized) {
+				return @{ XsiType = "xr:DesignTimeRef"; Text = $normalized }
+			}
+		}
+	}
+
+	return @{ XsiType = "xs:string"; Text = $s }
+}
+
+# Emit Presentation block for a choiceList item.
+# Accepts string (ru only), or hashtable/PSCustomObject {ru, en, ...}.
+# Empty/null → emits empty <Presentation/>.
+function Emit-ChoicePresentation {
+	param($pres, [string]$indent)
+	if ($null -eq $pres -or ($pres -is [string] -and [string]::IsNullOrEmpty($pres))) {
+		X "$indent<Presentation/>"
+		return
+	}
+
+	$pairs = @()
+	if ($pres -is [string]) {
+		$pairs += ,@("ru", $pres)
+	} elseif ($pres -is [hashtable] -or $pres -is [System.Collections.IDictionary]) {
+		foreach ($k in $pres.Keys) { $pairs += ,@("$k", "$($pres[$k])") }
+	} elseif ($pres.PSObject -and $pres.PSObject.Properties) {
+		foreach ($p in $pres.PSObject.Properties) { $pairs += ,@("$($p.Name)", "$($p.Value)") }
+	} else {
+		$pairs += ,@("ru", "$pres")
+	}
+
+	X "$indent<Presentation>"
+	foreach ($pair in $pairs) {
+		X "$indent`t<v8:item>"
+		X "$indent`t`t<v8:lang>$($pair[0])</v8:lang>"
+		X "$indent`t`t<v8:content>$(Esc-Xml $pair[1])</v8:content>"
+		X "$indent`t</v8:item>"
+	}
+	X "$indent</Presentation>"
+}
+
+function Emit-Radio {
+	param($el, [string]$name, [int]$id, [string]$indent)
+
+	X "$indent<RadioButtonField name=`"$name`" id=`"$id`">"
+	$inner = "$indent`t"
+
+	if ($el.path) { X "$inner<DataPath>$($el.path)</DataPath>" }
+
+	Emit-Title -el $el -name $name -indent $inner -auto:(-not $el.path)
+	Emit-CommonFlags -el $el -indent $inner
+
+	# TitleLocation default is None for radio (matches typical configurator behavior)
+	$tl = if ($el.titleLocation) {
+		switch ("$($el.titleLocation)") {
+			"none"   { "None" }
+			"left"   { "Left" }
+			"right"  { "Right" }
+			"top"    { "Top" }
+			"bottom" { "Bottom" }
+			default  { "$($el.titleLocation)" }
+		}
+	} else { "None" }
+	X "$inner<TitleLocation>$tl</TitleLocation>"
+
+	# RadioButtonType: Auto | RadioButtons | Tumbler. Accept synonyms.
+	$rbtRaw = if ($el.radioButtonType) { "$($el.radioButtonType)".Trim() } else { "Auto" }
+	$rbt = switch -Regex ($rbtRaw.ToLower()) {
+		'^(auto|авто)$'                        { "Auto"; break }
+		'^(radiobuttons?|переключатель|радио)$' { "RadioButtons"; break }
+		'^(tumbler|тумблер)$'                  { "Tumbler"; break }
+		default                                { $rbtRaw }
+	}
+	X "$inner<RadioButtonType>$rbt</RadioButtonType>"
+
+	if ($null -ne $el.columnsCount) {
+		X "$inner<ColumnsCount>$($el.columnsCount)</ColumnsCount>"
+	}
+
+	# ChoiceList
+	if ($el.choiceList -and $el.choiceList.Count -gt 0) {
+		X "$inner<ChoiceList>"
+		$itemIndent = "$inner`t"
+		foreach ($item in $el.choiceList) {
+			# Pull value (and tolerate Russian synonym "значение")
+			$valRaw = $null
+			if ($item -is [hashtable] -or $item -is [System.Collections.IDictionary]) {
+				if ($item.Contains("value")) { $valRaw = $item["value"] }
+				elseif ($item.Contains("значение")) { $valRaw = $item["значение"] }
+			} else {
+				if ($item.PSObject.Properties["value"])    { $valRaw = $item.value }
+				elseif ($item.PSObject.Properties["значение"]) { $valRaw = $item."значение" }
+			}
+
+			# Pull presentation (presentation OR title synonym)
+			$presRaw = $null
+			$hasPres = $false
+			if ($item -is [hashtable] -or $item -is [System.Collections.IDictionary]) {
+				if ($item.Contains("presentation")) { $presRaw = $item["presentation"]; $hasPres = $true }
+				elseif ($item.Contains("представление")) { $presRaw = $item["представление"]; $hasPres = $true }
+				elseif ($item.Contains("title")) { $presRaw = $item["title"]; $hasPres = $true }
+			} else {
+				if ($item.PSObject.Properties["presentation"]) { $presRaw = $item.presentation; $hasPres = $true }
+				elseif ($item.PSObject.Properties["представление"]) { $presRaw = $item."представление"; $hasPres = $true }
+				elseif ($item.PSObject.Properties["title"]) { $presRaw = $item.title; $hasPres = $true }
+			}
+
+			$norm = Normalize-ChoiceValue -value $valRaw
+
+			# Auto-derive presentation if missing
+			if (-not $hasPres) {
+				if ($norm.XsiType -eq "xr:DesignTimeRef") {
+					$tail = ($norm.Text -split '\.')[-1]
+					$presRaw = Title-FromName -name $tail
+				} elseif ($norm.XsiType -eq "xs:string") {
+					$presRaw = $norm.Text
+				} else {
+					$presRaw = $norm.Text
+				}
+			}
+
+			X "$itemIndent<xr:Item>"
+			$valIndent = "$itemIndent`t"
+			X "$valIndent<xr:Presentation/>"
+			X "$valIndent<xr:CheckState>0</xr:CheckState>"
+			X "$valIndent<xr:Value xsi:type=`"FormChoiceListDesTimeValue`">"
+			Emit-ChoicePresentation -pres $presRaw -indent "$valIndent`t"
+			X "$valIndent`t<Value xsi:type=`"$($norm.XsiType)`">$(Esc-Xml $norm.Text)</Value>"
+			X "$valIndent</xr:Value>"
+			X "$itemIndent</xr:Item>"
+		}
+		X "$inner</ChoiceList>"
+	}
+
+	# Companions
+	Emit-Companion -tag "ContextMenu" -name "${name}КонтекстноеМеню" -indent $inner
+	Emit-Companion -tag "ExtendedTooltip" -name "${name}РасширеннаяПодсказка" -indent $inner
+
+	Emit-Events -el $el -elementName $name -indent $inner -typeKey "radio"
+
+	X "$indent</RadioButtonField>"
 }
 
 function Emit-Label {
