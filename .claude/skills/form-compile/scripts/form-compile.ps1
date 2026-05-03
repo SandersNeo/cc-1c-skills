@@ -1,4 +1,4 @@
-﻿# form-compile v1.17 — Compile 1C managed form from JSON or object metadata
+﻿# form-compile v1.18 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$JsonPath,
@@ -1904,6 +1904,7 @@ function Emit-Element {
 		# layout
 		"titleLocation"=1;"representation"=1;"width"=1;"height"=1
 		"horizontalStretch"=1;"verticalStretch"=1;"autoMaxWidth"=1;"autoMaxHeight"=1
+		"maxWidth"=1;"maxHeight"=1
 		# input-specific
 		"multiLine"=1;"passwordMode"=1;"choiceButton"=1;"clearButton"=1
 		"spinButton"=1;"dropListButton"=1;"markIncomplete"=1;"skipOnInput"=1;"inputHint"=1
@@ -2095,7 +2096,9 @@ function Emit-Input {
 	} elseif ($el.multiLine -eq $true) {
 		X "$inner<AutoMaxWidth>false</AutoMaxWidth>"
 	}
+	if ($null -ne $el.maxWidth) { X "$inner<MaxWidth>$($el.maxWidth)</MaxWidth>" }
 	if ($el.autoMaxHeight -eq $false) { X "$inner<AutoMaxHeight>false</AutoMaxHeight>" }
+	if ($null -ne $el.maxHeight) { X "$inner<MaxHeight>$($el.maxHeight)</MaxHeight>" }
 	if ($el.width) { X "$inner<Width>$($el.width)</Width>" }
 	if ($el.height) { X "$inner<Height>$($el.height)</Height>" }
 	if ($el.horizontalStretch -eq $true) { X "$inner<HorizontalStretch>true</HorizontalStretch>" }
@@ -2376,7 +2379,9 @@ function Emit-Label {
 
 	if ($el.hyperlink -eq $true) { X "$inner<Hyperlink>true</Hyperlink>" }
 	if ($el.autoMaxWidth -eq $false) { X "$inner<AutoMaxWidth>false</AutoMaxWidth>" }
+	if ($null -ne $el.maxWidth) { X "$inner<MaxWidth>$($el.maxWidth)</MaxWidth>" }
 	if ($el.autoMaxHeight -eq $false) { X "$inner<AutoMaxHeight>false</AutoMaxHeight>" }
+	if ($null -ne $el.maxHeight) { X "$inner<MaxHeight>$($el.maxHeight)</MaxHeight>" }
 	if ($el.width) { X "$inner<Width>$($el.width)</Width>" }
 	if ($el.height) { X "$inner<Height>$($el.height)</Height>" }
 

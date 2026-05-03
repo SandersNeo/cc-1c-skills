@@ -126,7 +126,8 @@ powershell.exe -NoProfile -File .claude/skills/form-compile/scripts/form-compile
 | `skipOnInput: true` | Пропускать при обходе Tab | |
 | `inputHint` | Подсказка в пустом поле | `"Введите наименование..."` |
 | `width` / `height` | Размер | числа |
-| `autoMaxWidth: false` | Отключить авто-ширину | для фиксированных полей |
+| `autoMaxWidth: false` | Снять авто-ограничение ширины (поле растянется) | |
+| `maxWidth` / `maxHeight` | Жёсткое ограничение размера | числа; обычно вместе с `autoMaxWidth: false` |
 | `horizontalStretch: true` | Растягивать по ширине | |
 
 ### Чекбокс (check)

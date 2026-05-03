@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# form-compile v1.17 — Compile 1C managed form from JSON or object metadata
+# form-compile v1.18 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import copy
@@ -1346,6 +1346,7 @@ KNOWN_KEYS = {
     "on", "handlers",
     "titleLocation", "representation", "width", "height",
     "horizontalStretch", "verticalStretch", "autoMaxWidth", "autoMaxHeight",
+    "maxWidth", "maxHeight",
     "multiLine", "passwordMode", "choiceButton", "clearButton",
     "spinButton", "dropListButton", "markIncomplete", "skipOnInput", "inputHint",
     "hyperlink",
@@ -1903,8 +1904,12 @@ def emit_input(lines, el, name, eid, indent):
             lines.append(f'{inner}<AutoMaxWidth>false</AutoMaxWidth>')
     elif el.get('multiLine') is True:
         lines.append(f'{inner}<AutoMaxWidth>false</AutoMaxWidth>')
+    if el.get('maxWidth') is not None:
+        lines.append(f'{inner}<MaxWidth>{el["maxWidth"]}</MaxWidth>')
     if el.get('autoMaxHeight') is False:
         lines.append(f'{inner}<AutoMaxHeight>false</AutoMaxHeight>')
+    if el.get('maxHeight') is not None:
+        lines.append(f'{inner}<MaxHeight>{el["maxHeight"]}</MaxHeight>')
     if el.get('width'):
         lines.append(f'{inner}<Width>{el["width"]}</Width>')
     if el.get('height'):
@@ -2031,8 +2036,12 @@ def emit_label(lines, el, name, eid, indent):
         lines.append(f'{inner}<Hyperlink>true</Hyperlink>')
     if el.get('autoMaxWidth') is False:
         lines.append(f'{inner}<AutoMaxWidth>false</AutoMaxWidth>')
+    if el.get('maxWidth') is not None:
+        lines.append(f'{inner}<MaxWidth>{el["maxWidth"]}</MaxWidth>')
     if el.get('autoMaxHeight') is False:
         lines.append(f'{inner}<AutoMaxHeight>false</AutoMaxHeight>')
+    if el.get('maxHeight') is not None:
+        lines.append(f'{inner}<MaxHeight>{el["maxHeight"]}</MaxHeight>')
     if el.get('width'):
         lines.append(f'{inner}<Width>{el["width"]}</Width>')
     if el.get('height'):
